@@ -35,6 +35,7 @@ import workflow_runtime
 import integration_jobs
 import workflow_evidence
 import stuck_detector
+import review_diversity
 
 HOME = Path.home()
 ROOT = Path(__file__).resolve().parent
@@ -2619,6 +2620,15 @@ def qa_guarded(path, reviewer=None):
         write_json(D["state"] / f"{s}.json", {"cluster": s, "outcome": "qa-driver-error", "error": repr(e)})
 
 
+def diversity_ok(rec, reviewer, path):
+    """research/code-factories: may this reviewer take this review? Always True unless qwen/REVIEW-DIVERSITY.json
+    enables the cross-family rule (review_diversity.py); a fault in the rule never blocks a review."""
+    try:
+        return review_diversity.reviewer_ok(rec, reviewer, review_diversity.waited_hours(path))
+    except Exception:            # noqa: BLE001
+        return True
+
+
 def qa_loop():
     import concurrent.futures
     (ROOT / "qa.pid").write_text(str(os.getpid()))
@@ -2686,13 +2696,14 @@ def qa_loop():
             if room_luna <= 0 and room_haiku <= 0:
                 break
             try:
-                needs_luna = fixed_by_haiku(json.loads(p.read_text()))
+                prec = json.loads(p.read_text())
+                needs_luna = fixed_by_haiku(prec)
             except (OSError, ValueError):
                 continue
-            if room_luna > 0:
+            if room_luna > 0 and diversity_ok(prec, "luna", p):
                 active[pool.submit(qa_guarded, p, "luna")] = (p.name, "luna")
                 room_luna -= 1
-            elif room_haiku > 0 and not needs_luna:
+            elif room_haiku > 0 and not needs_luna and diversity_ok(prec, "haiku", p):
                 active[pool.submit(qa_guarded, p, "haiku")] = (p.name, "haiku")
                 room_haiku -= 1
         busy = [r for _, r in active.values()]
