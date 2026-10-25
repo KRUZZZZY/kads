@@ -102,3 +102,7 @@ qwen/FOLLOWUP-SWEEP.md
 !qwen/SCOPE-GUARD.json
 !qwen/REVIEW-DIVERSITY.json
 !qwen/FRESHNESS-GATE.json
+# public release (2026-10-25)
+!LICENSE
+!patrol/prompt.txt
+systemd/*.bak*

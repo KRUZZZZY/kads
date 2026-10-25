@@ -1,0 +1,25 @@
+You are hunting bugs in Zene Studio 0.5.0, a music workstation (DAW) derived from LMMS: C++20, Qt 6, GPLv2. Do not run any commands or tools - everything you need is in the stdin block, which is one slice of the code base. It holds three kinds of file: files the fork wrote (given whole with line numbers, marked FILE), upstream LMMS files the fork changed (given as unified diffs, marked DIFF), and upstream LMMS files the fork kept unchanged (given whole with line numbers, marked UPSTREAM FILE). Zene ships all three, so a bug in unchanged LMMS code is a real Zene bug - report it the same way. Other slices are being read by other reviewers, so focus on what is in front of you, but say so if something here clearly breaks against code you can infer exists elsewhere.
+
+This pass looks especially for: {ANGLE} Report other bugs you notice too.
+
+Find as many real bugs as you can. Read it however you like. Every time you find one, write it down straight away and keep going - do not stop at the first, the fifth or the twentieth, and do not polish earlier entries before moving on.
+
+Useful background (not a checklist):
+- Commands are registered in a ControlRegistry and reached over a JSON-RPC socket, Lua and MCP; mutating commands should leave exactly one undo step (ProjectJournal) and their reversibility row should be honest.
+- Every command's arguments are validated against its declared argsSchema BEFORE the handler runs (ControlRegistry::invoke -> validateArgs): a wrong type, a fractional value for an integer field, a missing required field or an out-of-range enum never reaches the handler. Report an argument bug only where the schema cannot catch it (an untyped array/object field, a value the schema allows but the handler mishandles, or data read from a project file).
+- Realtime rule: nothing on the audio thread (process/render paths, play handles, mixer channel processing, anything called per period) may allocate, lock a mutex, log, or touch Qt objects that allocate.
+- Ids and indices start at 0, so 0 is not a usable "none" sentinel; f_cnt_t / tick-like types may be unsigned, so -1 sentinels on them are bugs.
+- Qt 6: a default-constructed QJsonValue is Null, not Undefined; a QDomElement not appended to its document serialises to nothing; deleteLater'd widgets linger until the event loop runs.
+- tick_t is std::int32_t (signed); project journal ids always carry the high bit, so 0 is never a real id; a cloned Clip adds itself to its track in Clip's copy constructor; slots is a Qt macro.
+- Known by design, do not report: the append-only <z:provenance> save journal; undo coalescing and 'undone_commands'; mastering.run's async acknowledgement; boolean param_set refusing fractions; first save reported reversible:false; empty-active tempo-map persistence; fx-id renumbering after removal; id:-1 replies to malformed wire messages.
+
+For each bug write:
+BUG <n>: <one-line title>
+  where: <file>:<line> (the line numbers given for new files; for diffs, the + line's position in the new file as best you can tell)
+  what: what is wrong
+  when: a concrete input, state or sequence that makes it go wrong, and what happens (crash, wrong value, lost undo, data loss, UI wrong...)
+  fix: a short suggestion
+  difficulty: easy / hard / unsure - how hard the FIX is, assuming the bug is real. easy = a small local patch that keeps intended contracts, with a practical deterministic regression test (input validation, checked arithmetic, state/result cleanup, bookkeeping). hard = needs concurrency or lifetime architecture, realtime coordination, a design/API decision, platform/hardware/dependency work, or changes across components.
+  confidence: high / medium / low
+
+Report low-confidence suspicions too, marked low - they will be checked. At the end, one line: "TOTAL: <n> bugs". No preamble, no summary beyond that.
