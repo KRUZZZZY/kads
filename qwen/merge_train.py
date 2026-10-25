@@ -610,6 +610,34 @@ def manifest_recipe(header):
     return recipe if "git ls-files" in recipe else ""
 
 
+# ------------------------------------------------------------------ freshness gate (research/code-factories)
+def freshness_gate(base, cands):
+    """(config or None, early-train reason or None). Off unless qwen/FRESHNESS-GATE.json enables it; never fatal."""
+    try:
+        import conflict_forecast
+        cfg = conflict_forecast.config()
+        if not cfg["enabled"] or not cands:
+            return None, None
+        reason = conflict_forecast.early_due(conflict_forecast.forecast(WT, base, cands), cfg) \
+            if cfg["early_train"] else None
+        return cfg, reason
+    except Exception as e:      # noqa: BLE001
+        log(f"freshness gate ignored: {e!r}")
+        return None, None
+
+
+def freshness_order(base, cands):
+    try:
+        import conflict_forecast
+        ordered = conflict_forecast.order(conflict_forecast.forecast(WT, base, cands), cands)
+        if [c["commit"] for c in ordered] != [c["commit"] for c in cands]:
+            log("freshness gate: most exposed branches merge first")
+        return ordered
+    except Exception as e:      # noqa: BLE001
+        log(f"freshness order ignored: {e!r}")
+        return cands
+
+
 # ------------------------------------------------------------------ the train
 def run(force=False, dry=False):
     base = (ROOT / "FIX-BASE").read_text().strip()
@@ -636,12 +664,18 @@ def run(force=False, dry=False):
     if not cands and not force:      # 2026-10-25: train 14 ran a whole build + bar with 0 merges
         log("no train due (nothing to merge)")
         return 0
-    if not force and not pending_integrations and len(cands) < MIN_CANDIDATES and not (cands and age_h > MAX_WAIT_H):
+    gate, early = freshness_gate(base, cands)
+    if early:
+        log(f"freshness gate: train due early - {early}")
+    if not force and not pending_integrations and not early and len(cands) < MIN_CANDIDATES and \
+            not (cands and age_h > MAX_WAIT_H):
         log("no train due")
         return 0
     if len(cands) > MAX_MERGES:
         log(f"taking the oldest {MAX_MERGES} of {len(cands)}; the rest wait for the next train")
         cands = cands[:MAX_MERGES]
+    if gate and gate.get("order"):
+        cands = freshness_order(base, cands)
     if free_gb() < MIN_FREE_GB:
         log(f"only {free_gb():.0f} GB free - train postponed")
         notify(f"Merge train postponed: only {free_gb():.0f} GB disk free.")
