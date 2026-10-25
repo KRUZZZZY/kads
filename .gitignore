@@ -96,3 +96,9 @@ qwen/FOLLOWUP-SWEEP.md
 !bunny/shims/rg
 !qwen/shims/mcode
 !systemd/*
+# knobs of the research/code-factories ports (2026-10-25)
+!qwen/CONFIG-JOURNAL.json
+!qwen/STUCK-DETECTOR.json
+!qwen/SCOPE-GUARD.json
+!qwen/REVIEW-DIVERSITY.json
+!qwen/FRESHNESS-GATE.json
