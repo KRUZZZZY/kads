@@ -40,6 +40,7 @@ PROG = Path.home() / "Documents/AI_KOS_PROJECT/projects/zene-studio-program"
 WT = PROG / "zene-cachyos"
 LOG = ROOT / "logs/merge-train.log"
 MIN_CANDIDATES = 25
+MAX_MERGES = 40            # 2026-10-25: oldest 40 per train; train 10 (143 merges) failed 9 times in 25 h, trains of <= 21 promoted first try
 MAX_WAIT_H = 24
 COHORT_MAX_WAIT_H = 24     # an integration that waits longer than this stops holding the next train (the owner is told)
 MAX_REVERTS = 6
@@ -632,13 +633,27 @@ def run(force=False, dry=False):
             print(c["cluster"], c["branch"])
         return 0
     pending_integrations = list((ROOT / "integration-pending").glob("*.json"))
+    if not cands and not force:      # 2026-10-25: train 14 ran a whole build + bar with 0 merges
+        log("no train due (nothing to merge)")
+        return 0
     if not force and not pending_integrations and len(cands) < MIN_CANDIDATES and not (cands and age_h > MAX_WAIT_H):
         log("no train due")
         return 0
+    if len(cands) > MAX_MERGES:
+        log(f"taking the oldest {MAX_MERGES} of {len(cands)}; the rest wait for the next train")
+        cands = cands[:MAX_MERGES]
     if free_gb() < MIN_FREE_GB:
         log(f"only {free_gb():.0f} GB free - train postponed")
         notify(f"Merge train postponed: only {free_gb():.0f} GB disk free.")
         return 1
+    cur = git("branch", "--show-current")
+    if cur != base and not git("status", "--porcelain", "--untracked-files=no") and \
+            re.fullmatch(r"050/m0-train-\d+(-attempt-\d+)?", cur or ""):
+        # 2026-10-25: an OOM-killed train never reaches fail(), so the tree stayed on train-16 and every run
+        # postponed for 25 h. A clean tree on an unpromoted train branch is a dead attempt: go back to the base
+        # (the branch is kept; the next attempt renames it <train>-attempt-<ts>).
+        log(f"zene-cachyos was left on unpromoted {cur} (killed run?) - switching back to {base}")
+        git("switch", base, check=True)
     if git("status", "--porcelain", "--untracked-files=no") or git("branch", "--show-current") != base:
         log(f"zene-cachyos is not a clean checkout of {base} - train postponed")
         return 1
