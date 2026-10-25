@@ -182,6 +182,21 @@ def watch_trains(st, cfg, dry=False):
         st["stall_alert_at"] = time.time()
 
 
+def journal_config(dry=False):
+    """research/code-factories: record changes to the live knob files (config_journal.py). Off unless
+    qwen/CONFIG-JOURNAL.json says enabled; a fault here never stops the autopilot."""
+    try:
+        import config_journal
+        knob = L.ROOT / "CONFIG-JOURNAL.json"
+        if not (L.read(knob) or {}).get("enabled"):
+            return
+        config_journal.KNOB = knob
+        for note in config_journal.record(L.ROOT, dry=dry):
+            log(note, dry)
+    except Exception as e:      # noqa: BLE001
+        log(f"config journal error ignored: {e!r}", dry)
+
+
 def run(dry=False, prog=PROG):
     if (L.ROOT / "AUTOPILOT-OFF").exists():
         return []
@@ -200,6 +215,7 @@ def run(dry=False, prog=PROG):
     tune_train(st, cfg, dry)
     watch_services(st, dry)
     watch_trains(st, cfg, dry)
+    journal_config(dry)
     if not dry:
         L.write(L.ROOT / "AUTOPILOT-STATE.json", st)
     return done

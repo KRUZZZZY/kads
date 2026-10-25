@@ -34,6 +34,8 @@ import issue_ledger
 import workflow_runtime
 import integration_jobs
 import workflow_evidence
+import stuck_detector
+import review_diversity
 
 HOME = Path.home()
 ROOT = Path(__file__).resolve().parent
@@ -1378,6 +1380,7 @@ def run_session(cmd, brief, lf, env, run_dir, s, name):
     except BrokenPipeError:
         pass
     t0, told = time.time(), False
+    stuck_watch = stuck_detector.Watch(run_dir / "session.log")
 
     def last_activity():
         paths = [run_dir / "session.log"] + list((run_dir / "logs").glob("**/*"))
@@ -1386,8 +1389,18 @@ def run_session(cmd, brief, lf, env, run_dir, s, name):
     while proc.poll() is None:
         time.sleep(30)
         quiet = (time.time() - max(last_activity(), t0)) / 60
-        if quiet > SESSION_QUIET_MIN:
-            log("fix", f"{s}: {name} session silent for {quiet:.0f} min - stopped")
+        stuck = None
+        try:        # research/code-factories: off unless qwen/STUCK-DETECTOR.json says enabled; never breaks a session
+            verdict = stuck_watch.poll()
+            if verdict:
+                log("fix", f"{s}: {name} looks stuck ({verdict['kind']}: {verdict['detail']}; "
+                           f"{' / '.join(verdict['sample'])[:160]}) - action {stuck_watch.action}")
+                stuck = verdict if stuck_watch.action == "stop" else None
+        except Exception as e:                   # noqa: BLE001
+            log("fix", f"{s}: stuck detector error ignored: {e!r}")
+        if quiet > SESSION_QUIET_MIN or stuck:
+            if not stuck:
+                log("fix", f"{s}: {name} session silent for {quiet:.0f} min - stopped")
             for sig in (signal.SIGTERM, signal.SIGKILL):
                 try:
                     os.killpg(proc.pid, sig)
@@ -2653,6 +2666,15 @@ def qa_guarded(path, reviewer=None):
         write_json(D["state"] / f"{s}.json", {"cluster": s, "outcome": "qa-driver-error", "error": repr(e)})
 
 
+def diversity_ok(rec, reviewer, path):
+    """research/code-factories: may this reviewer take this review? Always True unless qwen/REVIEW-DIVERSITY.json
+    enables the cross-family rule (review_diversity.py); a fault in the rule never blocks a review."""
+    try:
+        return review_diversity.reviewer_ok(rec, reviewer, review_diversity.waited_hours(path))
+    except Exception:            # noqa: BLE001
+        return True
+
+
 def qa_loop():
     import concurrent.futures
     (ROOT / "qa.pid").write_text(str(os.getpid()))
@@ -2720,13 +2742,14 @@ def qa_loop():
             if room_luna <= 0 and room_haiku <= 0:
                 break
             try:
-                needs_luna = fixed_by_haiku(json.loads(p.read_text()))
+                prec = json.loads(p.read_text())
+                needs_luna = fixed_by_haiku(prec)
             except (OSError, ValueError):
                 continue
-            if room_luna > 0:
+            if room_luna > 0 and diversity_ok(prec, "luna", p):
                 active[pool.submit(qa_guarded, p, "luna")] = (p.name, "luna")
                 room_luna -= 1
-            elif room_haiku > 0 and not needs_luna:
+            elif room_haiku > 0 and not needs_luna and diversity_ok(prec, "haiku", p):
                 active[pool.submit(qa_guarded, p, "haiku")] = (p.name, "haiku")
                 room_haiku -= 1
         busy = [r for _, r in active.values()]
