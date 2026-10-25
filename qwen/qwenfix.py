@@ -960,6 +960,7 @@ def prepare_tree(item, run_dir):
             pinned = (item.get("integration") or {}).get("target_commit")
             base = git(lane, "rev-parse", "--verify", pinned or fix_base or "HEAD", check=True)   # FIX-BASE: newest line
             git(lane, "worktree", "add", "-b", branch, str(wt), base, check=True)
+    freshen(item, wt, branch, run_dir)
     configured = (wt / "build/CMakeCache.txt").exists() and \
         ((wt / "build/Makefile").exists() or (wt / "build/build.ninja").exists())
     if not configured:
@@ -982,6 +983,40 @@ def prepare_tree(item, run_dir):
             return wt, branch, f"configure failed (EXIT={rc}, {blog})"
     rc = slot_build(wt / "build", "zene", blog)
     return wt, branch, (f"zene build failed (EXIT={rc}, {blog})" if rc else None)
+
+
+def freshen(item, wt, branch, run_dir):
+    """2026-10-25: a reused branch (rework, retry, precheck bounce) is brought up to the newest train before the
+    session, so the head QA accepts already sits on FIX-BASE and the merge train has nothing to re-integrate (651 of
+    3,260 work sessions were integration of stale accepted patches). A conflict is left for the same warm session
+    to resolve: freshen.txt in the run dir becomes a note at the top of its brief. Skipped for integration jobs
+    (they pin their own base), dirty trees, and branches the train ever merged (merging a base that holds a revert
+    of the branch would silently undo the fix)."""
+    fx = ROOT / "FIX-BASE"
+    if item.get("integration") or not fx.exists() or (ROOT / "FRESHEN-OFF").exists():
+        return
+    base = fx.read_text().strip()
+    tip = git(wt, "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}")
+    if not tip or subprocess.run([GIT, "-C", str(wt), "merge-base", "--is-ancestor", tip, "HEAD"]).returncode == 0:
+        return
+    if git(wt, "status", "--porcelain", "--untracked-files=no"):
+        return
+    if git(wt, "log", "--oneline", "-1", "-F", f"--grep=Merge {branch} ", tip):
+        return
+    s = slug(item["cluster"])
+    r = subprocess.run([GIT, "-C", str(wt), "merge", "--no-edit", "-m",
+                        f"Merge {base} into {branch} (newest train, before the next round)\n\n"
+                        "Co-Authored-By: Zene fix-loop agent <noreply@zene.invalid>", tip], capture_output=True, text=True)
+    if r.returncode == 0:
+        log("fix", f"{s}: branch brought up to {base}")
+        return
+    files = [l[3:] for l in git(wt, "status", "--porcelain").splitlines() if l[:2] in ("UU", "AA", "DU", "UD", "AU", "UA")]
+    subprocess.run([GIT, "-C", str(wt), "merge", "--abort"], capture_output=True)
+    log("fix", f"{s}: branch conflicts with {base} in {', '.join(files[:6]) or '?'} - left for the session")
+    (run_dir / "freshen.txt").write_text(
+        f"FIRST: your branch is behind the newest train `{base}` and merging it conflicts in: {', '.join(files) or 'see git'}.\n"
+        f"Before anything else run `git merge {base}` in your worktree, resolve the conflicts keeping both your fix and the "
+        f"train's changes, rebuild, and commit the merge. Then continue with the rest of this brief.\n")
 
 
 def save_leftovers(wt, run_dir):
@@ -1390,6 +1425,8 @@ def fix_one(job, rework_file, engine="qwen"):
     head0 = git(wt, "rev-parse", "HEAD")
     if item.get("integration"):
         integration_jobs.apply(item, wt, run_dir)
+    if (run_dir / "freshen.txt").exists():     # freshen() left a train conflict for this session
+        job = {**job, "notes": (run_dir / "freshen.txt").read_text() + "\n" + (job.get("notes") or "")}
     (run_dir / "logs").mkdir(exist_ok=True)   # outside any git repo, so fff indexes it (worktree build/ is gitignored)
     brief = fix_brief(item, wt, rnd, job.get("notes"), logs=run_dir / "logs")
     (run_dir / "brief.md").write_text(brief)
