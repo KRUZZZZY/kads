@@ -34,6 +34,7 @@ import issue_ledger
 import workflow_runtime
 import integration_jobs
 import workflow_evidence
+import stuck_detector
 
 HOME = Path.home()
 ROOT = Path(__file__).resolve().parent
@@ -1338,6 +1339,7 @@ def run_session(cmd, brief, lf, env, run_dir, s, name):
     except BrokenPipeError:
         pass
     t0, told = time.time(), False
+    stuck_watch = stuck_detector.Watch(run_dir / "session.log")
 
     def last_activity():
         paths = [run_dir / "session.log"] + list((run_dir / "logs").glob("**/*"))
@@ -1346,8 +1348,18 @@ def run_session(cmd, brief, lf, env, run_dir, s, name):
     while proc.poll() is None:
         time.sleep(30)
         quiet = (time.time() - max(last_activity(), t0)) / 60
-        if quiet > SESSION_QUIET_MIN:
-            log("fix", f"{s}: {name} session silent for {quiet:.0f} min - stopped")
+        stuck = None
+        try:        # research/code-factories: off unless qwen/STUCK-DETECTOR.json says enabled; never breaks a session
+            verdict = stuck_watch.poll()
+            if verdict:
+                log("fix", f"{s}: {name} looks stuck ({verdict['kind']}: {verdict['detail']}; "
+                           f"{' / '.join(verdict['sample'])[:160]}) - action {stuck_watch.action}")
+                stuck = verdict if stuck_watch.action == "stop" else None
+        except Exception as e:                   # noqa: BLE001
+            log("fix", f"{s}: stuck detector error ignored: {e!r}")
+        if quiet > SESSION_QUIET_MIN or stuck:
+            if not stuck:
+                log("fix", f"{s}: {name} session silent for {quiet:.0f} min - stopped")
             for sig in (signal.SIGTERM, signal.SIGKILL):
                 try:
                     os.killpg(proc.pid, sig)
