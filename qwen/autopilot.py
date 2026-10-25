@@ -12,7 +12,7 @@ a recovered issue goes back to the normal dispatcher and its normal budgets.
      verdict): released after a cooldown so the dispatcher runs the diagnostic again, once per issue; the issue's
      diagnostic budget still applies.
   3. merge train killed by the OOM killer: halve its ctest parallelism (merge/BAR-JOBS, floor 2).
-  4. Alerts (notify-me, each at most once per its window): fix/QA loop down on two runs in a row; no train
+  4. Alerts (notify.py, each at most once per its window): fix/QA loop down on two runs in a row; no train
      promoted for stall_alert_h; train OOM-killed again at the parallelism floor.
 
 Everything it does goes to logs/autopilot.log; the daily digest summarises it. Settings: WORKFLOW.json "autopilot".
@@ -24,6 +24,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import notify as notify_backend
 
 import issue_ledger as L
 
@@ -51,7 +52,7 @@ def log(msg, dry=False):
 def notify(text, dry=False):
     log(f"alert: {text}", dry)
     if not dry and L.ROOT == L.LIVE_ROOT:
-        subprocess.run(["notify-me", text], capture_output=True, timeout=60)
+        notify_backend.send(text)
 
 
 def state():

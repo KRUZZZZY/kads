@@ -10,6 +10,7 @@ import json
 import subprocess
 import time
 from pathlib import Path
+import notify
 
 ROOT = Path(__file__).resolve().parent
 LANES = ROOT / "LANES.json"
@@ -50,8 +51,8 @@ def main():
 
 def done(d, lane, other):
     if lane:
-        subprocess.run(["notify-me", f"Zene: {lane['name']} finished its unit and is off; {other['name']} is now the one "
-                                     f"Sonnet lane (as asked)."], capture_output=True)
+        notify.send(f"Zene: {lane['name']} finished its unit and is off; {other['name']} is now the one "
+                    f"Sonnet lane (as asked).")
     subprocess.run(["systemctl", "--user", "stop", "zene-sonnet-handoff.timer"], capture_output=True)
 
 

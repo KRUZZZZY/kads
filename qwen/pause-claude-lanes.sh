@@ -14,4 +14,4 @@ d = json.load(open("LANES.json"))
 d["_note"] += f" {time.strftime('%Y-%m-%d %H:%M')} (scheduled, owner 2026-10-20): all Claude lanes disabled after the weekly reset."
 json.dump(d, open("LANES.json", "w"), indent=1); open("LANES.json", "a").write("\n")
 PY
-notify-me "Zene: Claude lanes paused after the weekly reset (as asked). Running sessions finish; nothing new starts." || true
+python3 "$(dirname "$0")/notify.py" "Zene: Claude lanes paused after the weekly reset (as asked). Running sessions finish; nothing new starts." || true

@@ -106,3 +106,4 @@ qwen/FOLLOWUP-SWEEP.md
 !LICENSE
 !patrol/prompt.txt
 systemd/*.bak*
+!qwen/NOTIFY.json

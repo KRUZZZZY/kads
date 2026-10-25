@@ -1,99 +1,136 @@
 # zene-studio-fix-pipeline
 
-**An unattended find → fix → review → merge pipeline for coding agents, built and run by one developer.**
+**An automated delegation surface for coding-agent harnesses.** You define the roles (finder, triager, fixer,
+reviewer, integrator), point each role at whichever agent harness and model you want, and the pipeline runs the
+work between them unattended: queue, routing, budgets, escalation, mechanical checks, independent review and merge
+trains. A human is needed only when every agent on the escalation ladder has failed a job.
 
-This is the system that keeps [Zene Studio](https://github.com/KRUZZZZY/zene-studio) (a C++/Qt DAW) moving with one
-person at the wheel. Agents find bugs, other agents fix them on their own branches, scripts check the work
-mechanically, an independent reviewer re-proves it, and accepted branches land together on a merge train that has to
-build and pass the tests before it becomes the new base. A human sees a job only when every model on the escalation
-ladder has failed it.
+It does not contain a model or an agent of its own. It is the control plane *around* agents. Today it drives Claude
+Code, OpenAI Codex, OpenCode, MiniMax Code, a DeepSeek harness and local Ollama models side by side, each as one
+or more "lanes" with its own quota, pacing and failure handling.
 
-It is published so other solo developers can take the parts that work for them. You do not need a DAW, a C++
-codebase or the same models. The [blueprint](docs/BLUEPRINT.md) describes every stage in a vendor-neutral way, with
-the exact algorithms, thresholds and prompt texts, plus a section on adapting it to a web/SaaS codebase and a
-Claude-only setup.
+> **Status: reference implementation, not yet repo-agnostic.** It was built for one repository,
+> [Zene Studio](https://github.com/KRUZZZZY/zene-studio) (a C++/Qt DAW). Paths, build and test commands, gates and
+> lane definitions are still wired to that repo and one workstation. The goal is to change that: open the pipeline,
+> pick an agent per role, point it at a repo, and get a bug tracker and queue for that repo. The work towards that is tracked in
+> [issue #1](https://github.com/KRUZZZZY/zene-studio-fix-pipeline/issues/1).
+> Until it lands, read this as a working design with working code you can lift from.
 
-## Why you might want it
+## What the surface does
 
-Coding agents have become cheap enough to run all day. Getting work you can trust out of them is the hard part. This pipeline is
-tuned around a few rules, most of which came from a failure:
+```
+            ┌──────────── roles (each delegated to any harness + model) ────────────┐
+ repo  ──►  │ Finder ──► Triage ──► Queue/Router ──► Fixer ──► Checks ──► Reviewer   │ ──► Merge train ──► new base
+            │  read-only   dedup,     difficulty,     own      submit,    evidence-  │     build + test all
+            │  sweeps      realness,  urgency,        worktree negative   only       │     together; doctor
+            │              ranking    per-model stats          control    verdicts   │     agent on repeats
+            └───────────────── rework ◄── escalation ladder ◄── rejection ───────────┘
+```
 
-- **Finders never fix, fixers never review their own work, reviewers are independent.** Each role is a fresh
-  session with its own brief. A built-in rule keeps Haiku from reviewing Haiku, and an optional knob extends that
-  to any same-family pair.
-- **Mechanical checks before judgement.** Before any model reviews a fix, a script checks that the commits exist,
-  that tests changed and that the gates pass. It then runs a **negative control**: it reverts the product change and
-  requires the new test to *fail* without the fix and pass with it.
-- **Rejections need evidence:** a `file:line` or a command with its exit code. "Might" and style comments are notes,
-  not blockers.
-- **Infrastructure failures are not attempts.** An outage or usage limit rests that model and requeues the job. It
-  never burns a round.
-- **Escalate instead of parking.** Failed work climbs a ladder of stronger models.
-- **Never weaken a check.** Skipping, deleting or loosening a test, gate or baseline is a rejection category of its
-  own.
-- **Integration is its own test.** Changes reviewed alone still break each other. A batch becomes the base only
-  after a merge train builds and tests all of it together.
-- **Everything is journalled and live-configurable.** Decisions go to JSONL ledgers, and every routing knob is a
-  small file that is read fresh on each loop.
+For each role it supplies:
 
-## The stages
+- **A brief.** Each role starts in a fresh session with its own prompt (see Appendix A of the blueprint) and a
+  clear definition of done.
+- **A harness adapter.** It starts the session, sandboxes it in its own git worktree, watches it (silence timeout,
+  stuck detection), and reads back a structured report.
+- **Routing.** The job goes to the cheapest lane whose measured acceptance rate at that difficulty is good enough.
+  Measurements are kept continuously per model (`benchmark.py`).
+- **Budget handling.** Usage limits, provider outages and rate limits rest the lane and requeue the job. They never
+  count as a failed attempt.
+- **Escalation.** Failed work climbs a ladder of stronger models instead of being parked.
+- **Mechanical checks before any judgement.** Commits exist, tests changed, gates pass, the patch stays in scope,
+  and a negative control requires the new test to *fail* with the fix reverted.
+- **Independent review.** A reviewer from a different session, and optionally a different model family, re-proves
+  the fix. Rejections count only with evidence (`file:line` or a command and its exit code).
+- **Integration.** Accepted branches merge in trains that must build and pass the full suite against a
+  known-failures baseline before becoming the new base. A "train doctor" agent diagnoses trains that keep failing.
+- **Operator messaging on any platform.** Alerts, the daily digest and escalations go through one adapter
+  (`qwen/notify.py`). Pick the backend in `qwen/NOTIFY.json`: any command, a Slack/Discord/generic webhook, ntfy,
+  Telegram, a log file, or several at once. Tokens come from environment variables, never from the file.
+- **A journal of everything.** Decisions go to JSONL ledgers. Every routing knob is a small file read fresh each
+  loop, so policy changes need no restart.
 
-| Stage | What happens | Where |
-|---|---|---|
-| 1. Find | A read-only agent sweeps the code in slices, rotating "angles" (threads, lifetimes, edge cases, UI state, ...) | `patrol/patrol.py`, `patrol/prompt.txt` |
-| 2. Triage | Dedup with embeddings plus a small classifier, realness (real / false positive / already fixed / needs context), difficulty and urgency ranking, root-cause families | `patrol/dedup.py`, `classify.py`, `bug_difficulty_*.py`, `bug_urgency_*.py`, `root_causes.py` |
-| 3. Queue and route | Order the queue and pick a fixer per job by difficulty and measured per-model acceptance | `qwen/qwenfix.py`, `qwen/benchmark.py`, `qwen/adaptive.py` |
-| 4. Fix | Reproduce, write a failing test, fix, prove, report, each job in its own git worktree | `qwen/qwenfix.py`, harness configs in `dsh/`, `mcode/` |
-| 5. Mechanical checks | Pre-submit completion check, scope guard, negative control | `qwen/submit_check.py`, `qwen/scope_guard.py`, `qwen/negctl.py` |
-| 6. Review | Independent reviewer, evidence-only rejections, optional reviewer-diversity rule | `qwen/qwenfix.py` (QA loop), `qwen/review_diversity.py` |
-| 7. Rework and escalation | Same session up to N rounds, then the next model up the ladder | `qwen/qwenfix.py`, `qwen/stuck_detector.py` |
-| 8. Integration | Merge trains with a known-failures baseline, confirm-by-reversal, conflict forecast, and a "train doctor" agent that diagnoses repeat failures | `qwen/merge_train.py`, `qwen/conflict_forecast.py`, `qwen/train_doctor.py` |
+## Design rules
 
-Supporting pieces: usage monitoring and pacing across subscriptions (`qwen/usage_monitor.py`, `usage_guard.py`,
-`luna_pace.py`), autoscaling lanes (`qwen/autoscale.py`), a daily digest (`qwen/digest.py`), a build jobserver that
-stops parallel agents from exhausting RAM (`bunny/`), and systemd units for all of it (`systemd/`).
+Most of these came from a failure in production:
 
-## How to use it
+1. Finders never fix, fixers never review their own work, reviewers are independent.
+2. Anything a script can decide is decided before a model sees it.
+3. Rejections need evidence. "Might" and style comments are notes, not blockers.
+4. A classifier's "unsure" becomes "needs context", never "not a bug".
+5. Infrastructure failures are not attempts.
+6. Escalate instead of parking.
+7. Never weaken a check: skipping or loosening a test, gate or baseline is its own rejection category.
+8. Integration is a separate, mandatory test.
+9. Everything is journalled, resumable and live-configurable.
+10. Cheap models first, measured continuously; routing follows the numbers.
 
-Be clear about what this is: **a working system lifted from one machine, not a packaged tool.** The code has
-Zene's paths, model lanes, build commands and gates wired in. There are three ways to take from it:
+## Using it today
 
-1. **Take the design.** Read [docs/BLUEPRINT.md](docs/BLUEPRINT.md). Section 19.1 is a minimum viable version you
-   can build in a week or two on your own stack: a CSV queue, one fixer in a sandboxed worktree, the pre-submit check
-   and negative control, one reviewer from a different model tier, a rework loop and your existing CI as the
-   integration step. Appendix A has the prompts verbatim; Appendix B has every threshold.
-2. **Lift single modules.** The smaller modules are close to standalone and short enough to adapt in an afternoon:
-   `negctl.py` (~130 lines), `submit_check.py`, `scope_guard.py`, `stuck_detector.py`, `review_diversity.py`,
-   `conflict_forecast.py`. Each says in its docstring what it does and what it assumes. Swap the build/test
-   commands and path conventions for yours.
-3. **Run the whole thing.** Possible, but you will be editing paths and lanes in `qwen/qwenfix.py`,
-   `qwen/LANES.json` and the knob files, and replacing the C++ build and gate commands. `qwen/README.md` and
-   `qwen/WORKFLOW.md` are the operating notes.
+Three ways in, from least to most effort:
 
-Section 12 of the blueprint maps every Zene-specific concept onto a web/SaaS equivalent. It covers what to check,
-what to sandbox and what to use as the integration branch. **Never give these bots production access or production
-data.** Each job needs its own sandbox, with push blocked and only scoped tokens.
+1. **Take the design.** [docs/BLUEPRINT.md](docs/BLUEPRINT.md) describes every stage independently of any model:
+   algorithms, thresholds, prompts, failure modes and a build order. Section 19.1 is a minimum viable version you
+   can build on your own stack in a week or two. Section 12 maps it onto a web/SaaS codebase and a Claude-only
+   setup.
+2. **Lift single modules.** These are short and close to standalone: `negctl.py` (negative control),
+   `submit_check.py` (pre-submit checklist), `scope_guard.py`, `stuck_detector.py`, `review_diversity.py`,
+   `conflict_forecast.py`. Swap in your build and test commands.
+3. **Run the whole thing.** Possible, but expect to edit paths, lanes and build/gate commands by hand (see
+   `qwen/README.md` and `qwen/WORKFLOW.md`). This is the part [issue #1](https://github.com/KRUZZZZY/zene-studio-fix-pipeline/issues/1) sets out to remove.
+
+### Choosing where notifications go
+
+With no `qwen/NOTIFY.json`, messages go to a `notify-me` command, as in the reference deployment. For anything else:
+
+```json
+{"backends": [
+  {"backend": "webhook", "url_env": "SLACK_WEBHOOK_URL", "field": "text"},
+  {"backend": "file", "path": "logs/notify.log"}
+]}
+```
+
+Other backends: `{"backend": "webhook", "url_env": "DISCORD_WEBHOOK_URL", "field": "content"}`,
+`{"backend": "ntfy", "topic_url_env": "NTFY_TOPIC_URL"}`,
+`{"backend": "telegram", "token_env": "TELEGRAM_BOT_TOKEN", "chat_id_env": "TELEGRAM_CHAT_ID"}`,
+`{"backend": "command", "command": ["your-pager", "--to", "ops"]}`, and `{"backend": "none"}`. The file is read on every
+message, so a change applies at once. Check what is configured with `python3 qwen/notify.py --check`.
+
+**Never give the agents production access or production data.** Each job needs its own sandbox, with push blocked
+and only scoped tokens.
 
 ## Layout
 
-| Path | What |
+| Path | Role in the pipeline |
 | --- | --- |
-| `docs/BLUEPRINT.md` | The full design: roles, stages, algorithms, thresholds, prompts, failure modes, build order |
-| `patrol/` | Stages 1–2: the finder sweep and the triage tools (dedup, classify, difficulty, urgency, root causes) |
-| `qwen/` | Stages 3–8: dispatcher and fix/QA loops (`qwenfix.py`), mechanical checks, merge train, train doctor, usage and autoscaling, tests (`test_*.py`), and the live knob files the loops read |
-| `bunny/` | Build slot driver, jobserver and command shims that cap build parallelism |
-| `dsh/`, `mcode/` | Harness configs for the DeepSeek and MiniMax Code agent runners |
-| `status/` | Live status view (`zene_status.py --text`) |
-| `systemd/` | The user units and timers that run the loops |
+| `docs/BLUEPRINT.md` | The full design |
+| `patrol/` | **Finder and triage**: read-only sweep, dedup, realness classification, difficulty and urgency ranking, root-cause families |
+| `qwen/` | **Dispatcher** (the name is historical; the first fixer was a local Qwen model): routing, harness lanes, fix and review loops (`qwenfix.py`), mechanical checks, merge train, train doctor, usage pacing, autoscaling, benchmark, tests, and the live knob files |
+| `bunny/` | Build-slot jobserver and command shims, so parallel agents can't exhaust RAM or CPU |
+| `dsh/`, `mcode/` | Harness configs for the DeepSeek and MiniMax Code runners |
+| `status/` | Live status view |
+| `systemd/` | The units and timers that keep the loops running |
+
+## Names you will see in the code
+
+The code uses names from the reference deployment. They are all roles or lanes, not dependencies.
+
+| Name | What it is | Generic role |
+|---|---|---|
+| Zene, LMMS | the target repository and its upstream | *your repo* |
+| Luna | GPT 6.0 Luna through the Codex CLI | strong model lane (finder, reviewer) |
+| Clef | a small local model served by Ollama | classifier |
+| Strata, Qwen | local models on a home server | last-resort / overnight fixer |
+| OpenCode, DeepSeek, MiniMax | cheap hosted coding models in their own harnesses | default fixer lanes |
+| Haiku, Sonnet, Opus | Claude Code lanes | easy / normal / hard-tail fixer lanes |
+| owner | the human operator | *you* |
 
 Tests: `cd qwen && for t in test_*.py; do python3 $t; done`. `test_opencode_free.py` and `test_parallel_workers.py`
-read live state, so they pass only on a configured machine.
-
-API keys and credentials are never in this repository. They come from the environment or from files outside it.
+read live state, so they pass only on a configured machine. API keys are never in this repository.
 
 ## Credits and licence
 
 Several modules are clean-room ports of ideas from OpenHands, Uber SubmitQueue, Zuul, Shopify, Google CodeMender,
-SWE-agent and others. See [qwen/vendor/NOTICE.md](qwen/vendor/NOTICE.md). No third-party code is copied in.
+SWE-agent and others; see [qwen/vendor/NOTICE.md](qwen/vendor/NOTICE.md). No third-party code is copied in.
 
-MIT licensed, see [LICENSE](LICENSE). Issues and write-ups of your own adaptations are welcome.
+MIT licensed, see [LICENSE](LICENSE). Issues, ideas and write-ups of your own adaptations are welcome.

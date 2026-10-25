@@ -1,5 +1,5 @@
 [Unit]
-Description=Zene daily digest to Telegram
+Description=Zene daily digest to the operator
 
 [Service]
 Type=oneshot

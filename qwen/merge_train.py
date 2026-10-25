@@ -21,7 +21,7 @@ branches waiting, or any waiting for more than MAX_WAIT_H - and if so builds the
   6. gates: every gate that passed on the previous train must pass; complexity / file-length items new to this train
      are queued as split jobs (the ratchets are red on purpose and are never re-anchored);
   7. promote: FIX-BASE, a STATUS.md, restart the patrol on the new base, notify the owner. Anything unresolved leaves
-     the train unpromoted with the reason in logs/merge-train.log and a Telegram message.
+     the train unpromoted with the reason in logs/merge-train.log and an operator notification.
 Nothing is pushed. `merge_train.py --dry-run` only reports candidates; `--force` ignores the due check.
 """
 import argparse
@@ -33,6 +33,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import notify as notify_backend
 
 ROOT = Path(__file__).resolve().parent
 M = ROOT / "merge"
@@ -70,7 +71,7 @@ def bar_jobs():
 
 
 def notify(text):
-    subprocess.run(["notify-me", text], capture_output=True, timeout=60)
+    notify_backend.send(text)
 
 
 def git(*a, check=False, cwd=WT):

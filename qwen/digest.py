@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Daily digest on Telegram (owner 2026-10-19: "a daily digest" - fixes and features accepted, trains, usage, anything
+"""Daily digest to the operator's messaging backend, notify.py (owner 2026-10-19: "a daily digest" - fixes and features accepted, trains, usage, anything
 stuck). Run by zene-digest.timer at 09:00; `digest.py --print` shows it without sending."""
 import datetime
 import json
@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+import notify
 
 ROOT = Path(__file__).resolve().parent
 PROG = Path.home() / "Documents/AI_KOS_PROJECT/projects/zene-studio-program"
@@ -143,7 +144,7 @@ def main():
     if "--print" in sys.argv:
         print(text)
     else:
-        subprocess.run(["notify-me", text], timeout=60)
+        notify.send(text)
 
 
 if __name__ == "__main__":

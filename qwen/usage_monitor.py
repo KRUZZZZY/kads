@@ -15,7 +15,7 @@ Every run (systemd user timer, 10 min):
   V4.1 Flash 1017 on the opencode-go provider. Served in place under the current id -> the hold is lifted and the owner
   notified; served under a new id -> the owner is notified and the hold stays until the id is wired in (PAID_PLAN,
   OPENCODE-FREE.json, BUG-PREFER.json).
-Writes USAGE.json, appends usage-history.jsonl, and sends notify-me when a status changes.
+Writes USAGE.json, appends usage-history.jsonl, and sends a notification (notify.py) when a status changes.
 """
 import datetime
 import json
@@ -28,6 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 import opencode_free  # noqa: E402
+import notify as notify_backend
 
 STATUS = ROOT / "USAGE.json"
 HISTORY = ROOT / "usage-history.jsonl"
@@ -79,10 +80,7 @@ def deepseek_1017_on_go():
 
 
 def notify(text):
-    try:
-        subprocess.run(["notify-me", text], timeout=60, capture_output=True)
-    except (OSError, subprocess.SubprocessError):
-        pass
+    notify_backend.send(text)
 
 
 def main():

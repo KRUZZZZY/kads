@@ -5,10 +5,11 @@ Every 10 minutes: read the plan usage /usage shows (api.anthropic.com/api/oauth/
 ~/.claude/.credentials.json - sent only there, never printed or logged). At or above USAGE_STOP_PCT weekly the
 Haiku fixers get no sessions (LUNA-CAP fix=0; the fix process's light driver is Haiku via FIX-ENGINE, so Luna QA and
 the free OpenCode worker carry on) and USAGE-STOP records why. Below it (e.g. after the weekly reset) the normal cap
-comes back. If the usage cannot be read, it fails closed (fix=0). One notify-me per state change.
+comes back. If the usage cannot be read, it fails closed (fix=0). One notification per state change.
 Stop the guard: touch STOP-GUARD. Status: USAGE-GUARD.json."""
 import datetime, json, os, subprocess, sys, time, urllib.request
 from pathlib import Path
+import notify as notify_backend
 
 ROOT = Path(__file__).resolve().parent
 STOP_PCT = float(os.environ.get("USAGE_STOP_PCT", "20"))
@@ -28,7 +29,7 @@ def usage():
 
 
 def notify(text):
-    subprocess.run(["notify-me", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+    notify_backend.send(text)
 
 
 def main():

@@ -1,11 +1,23 @@
-# Autonomous find → fix → review → merge: a reproducible blueprint
+# An agent delegation surface: find → fix → review → merge
+
+_A reproducible blueprint for delegating a codebase's bug and feature work to coding-agent harnesses._
 
 Written 2026-10-21 from the code that runs the Zene Studio loops today. It is meant to be rebuilt elsewhere. Every
 stage gives its purpose, inputs and outputs, the exact algorithm and thresholds, the prompt text (verbatim, in the
 appendix), how it fails, and how it is verified.
 
-Zene is the reference implementation: a C++/Qt desktop app, a single owner, a mix of model vendors. Section 12 says
-what to change for a different product and for a Claude-only setup with your own small classifier model.
+The pipeline is a control plane, not an agent. It defines **roles** (finder, triager, router, fixer, checker,
+reviewer, integrator), hands each role to whichever **harness and model** you configure (Claude Code, Codex,
+OpenCode, a local model, ...), and owns everything between them: queue, routing, budgets, escalation, mechanical
+checks, review rules and integration.
+
+The numbers and examples come from the reference deployment, Zene Studio: a C++/Qt desktop app, one operator, a mix
+of model vendors. Section 12 says what to change for a different product and for a Claude-only setup with your own
+small classifier model.
+
+**Names from the reference deployment.** *Zene* / *LMMS* = the target repository and its upstream. *Luna* = GPT 6.0
+Luna through the Codex CLI (the strong lane). *Clef* = a small local classifier model. *Strata*, *Qwen* = local
+fallback models. *the owner* = the human operator. `qwen/` = the dispatcher's directory (a historical name).
 
 In this repository, paths starting `qwen/` are the loop code (`qwen/` here) and `tools/luna-patrol/` is `patrol/`.
 Other paths are relative to the Zene program repository, which is not part of this release.
@@ -68,7 +80,7 @@ These are the rules the system was tuned towards. Most of them came from a failu
 
 ## 2. Roles, independent of model
 
-| Role | What it does | Zene today | Suggested Claude + classifier setup |
+| Role | What it does | Reference deployment (Zene) | Suggested Claude + classifier setup |
 |---|---|---|---|
 | **Finder** | reads code slices and reports suspected bugs; never edits | GPT 6.0 Luna (codex, read-only, max effort) | Claude Opus or Sonnet, read-only, high effort |
 | **Deduplicator** | groups reports of the same defect | `nomic-embed-text` embeddings, plus Clef for the uncertain band | an embedding model, plus your classifier for the uncertain band |
@@ -185,13 +197,13 @@ Title, `where` (file:line), `what`, `when` (a concrete trigger and its effect), 
 ### Stop conditions
 - the `STOP` file;
 - a usage ceiling: `patrol-run.sh` will not start once the finder's weekly usage reaches 50 %;
-- a hold file: the owner limits the finder model to two of the three roles (finder, fixer, reviewer).
+- a hold file: the operator limits the finder model to two of the three roles (finder, fixer, reviewer).
 
 The integrator restarts the patrol on every new base.
 
 ## 5. Stage 2: triage
 
-**Clef** in Zene is a small local model, served by Ollama at `/v1/systemone`. It answers structured questions
+**The classifier** (Clef in Zene) is a small local model, served by Ollama at `/v1/systemone`. It answers structured questions
 (`noul` = a probability, `score` = 1–5, `choice`). It is free per call, which is why triage can be exhaustive.
 Every call is journalled with the content hash of its input, so runs resume. A model error stops the run; it never
 counts as an answer. **Your classifier** takes this role in a Claude setup (section 12.2).
@@ -371,7 +383,7 @@ unchanged, so no round is spent.
    - A session runs while it shows activity: its session log or run logs change.
    - It is stopped after **45 minutes of silence**. The harness wrappers also have a 25-minute silence watchdog,
      and 4 minutes to produce a first event.
-   - After **6 hours** the owner is notified, and nothing is killed.
+   - After **6 hours** the operator is notified, and nothing is killed.
 5. **Afterwards** the loop records: head before and after, commits, files, the report's verdict, minutes, the exit
    code, and leftovers (uncommitted edits are saved as a patch and reverted).
    - A session with commits goes on to the mechanical checks.
@@ -529,7 +541,7 @@ If anything fails, the reviewer's fix is dropped and the review is asked again.
 
 ### 10.2 Features
 A unit that fails its attempt is parked, and `features_queue.py` moves it one tier up:
-**free → middle (cheap strong model) → Sonnet → Opus → donation goal** (the owner funds it or drops it). The unit's
+**free → middle (cheap strong model) → Sonnet → Opus → human** (in Zene, a donation goal: the operator funds it or drops it). The unit's
 commits stay on its branch, and the next tier gets the last review as notes. Moves are recorded in `ESCALATIONS.json`.
 
 ### 10.3 What never escalates
@@ -580,8 +592,8 @@ is the error lines with paths, numbers and hashes stripped.
 - **What the loop checks.** Every named branch must be one that train actually merged.
 - **Applying the answer.** The loop applies it with the integrator's own port-job function and restarts the train.
   The train's full bar decides whether the doctor was right.
-- **The ladder.** A repeat failure goes one rung down: Sonnet 5.5 high → Muse Spark contributor high → GPT 6.1 Sol
-  medium → a random free model → local Strata. A rung whose model is unavailable at that moment is skipped. When all
+- **The ladder.** A repeat failure goes one rung down a configurable list of lanes, strongest first. Zene's is
+  Sonnet 5.5 high → Muse Spark contributor high → GPT 6.1 Sol medium → a random free model → local Strata. A rung whose model is unavailable at that moment is skipped. When all
   rungs fail, a human is told.
 
 ### 11.3 What review cannot see, and the train can
@@ -664,7 +676,7 @@ costs more per call, so exhaustive triage gets expensive.
   Log the tokens and cost of every attempt. The benchmark (section 16) needs them.
 
 ### 12.4 Human gates a company will probably want
-Zene runs with no human review by owner choice. In a company:
+Zene runs with no human review by the operator's choice. In a company:
 - **merging to `main`:** a human approves the promoted train, not each PR;
 - **escalation exhausted, driver errors, and train-doctor failures:** they go to a human queue;
 - **security-sensitive paths:** always need a human, or a second reviewer plus a human;
@@ -793,7 +805,7 @@ Always show the sample size: ±10 points at n = 24.
 - **Status window:** live sessions per model and role, queues, usage per plan. Also an "All bugs & features" view:
   every unit with status, rounds, models, rejections, escalation and a per-unit timeline, with a "repeated or
   troubled" filter (more than 2 rounds, more than 1 rejection, port jobs or escalations).
-- **Notifications** (Telegram) for promotions, failed trains, the doctor, sessions running past 6 hours, exhausted
+- **Notifications** (through `qwen/notify.py` to the backend set in `NOTIFY.json`; Telegram in Zene) for promotions, failed trains, the doctor, sessions running past 6 hours, exhausted
   ladders and scheduled lane changes. Not routine progress.
 
 ## 17. Operations
@@ -863,6 +875,10 @@ Always show the sample size: ±10 points at n = 24.
 ---
 
 ## Appendix A: prompt templates
+
+These are verbatim from the reference deployment, so they name Zene, LMMS, Luna and the "owner". Replace the
+product description, build and test commands, and rule sources with your repo's; keep the structure, the
+definition of done and the evidence rule.
 
 The project-specific text is kept so you can see how much context each prompt carries. Replace it with your own.
 `{...}` marks a value filled in at run time.

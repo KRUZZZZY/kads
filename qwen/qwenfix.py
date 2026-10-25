@@ -25,6 +25,7 @@ import signal
 import subprocess
 import sys
 import time
+import notify
 import urllib.request
 from pathlib import Path
 import adaptive
@@ -1415,8 +1416,8 @@ def run_session(cmd, brief, lf, env, run_dir, s, name):
         if not told and time.time() - t0 > SESSION_LONG_H * 3600:
             told = True
             log("fix", f"{s}: {name} session still active after {SESSION_LONG_H} h - left running")
-            subprocess.run(["notify-me", f"Zene: {s} ({name}) has been working for {SESSION_LONG_H} h and is still "
-                                         "active - left running (no time cap)."], capture_output=True)
+            notify.send(f"Zene: {s} ({name}) has been working for {SESSION_LONG_H} h and is still "
+                        "active - left running (no time cap).")
     return proc.returncode
 
 
