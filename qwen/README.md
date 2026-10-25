@@ -1,6 +1,32 @@
 # Qwen fixer + Luna QA (Zene bug queue)
 
-## Current operation (owner, 2026-10-12)
+## Current state (2026-10-25) - read this first
+
+The sections below are history from 2026-10-12; much of it no longer holds (local Qwen/Strata is paused, Haiku
+reviews are off, models and lanes changed almost daily). What is current:
+
+- **Version control:** this whole tree (`~/.local/share/zene-bunny-fix`) is a git repo: code, docs and the live knob
+  files. `.gitignore` keeps runs, logs, state, caches, backups and secrets (`sb-config.yaml`) out. Commit knob and
+  code changes; stop making `*.bak-*` copies.
+- **Services** (user systemd; unit copies in `../systemd/`): `zene-fix`, `zene-qa` (graceful restart = touch
+  `STOP-FIX` / `STOP-QA`), `zene-scope`, `zene-patrol` + `zene-triage` (held by `PATROL-HOLD`), timers
+  `zene-usage-monitor` (10 min), `zene-merge-train` (3 h), `zene-autopilot` (hourly), `zene-digest` (09:00).
+- **Workflow rules** (one issue ledger across models and ports, budgets, integration requests): `WORKFLOW.md`,
+  policy `WORKFLOW.json`. Methodology audit: `audits/methodology-2026-10-24/findings.md`.
+- **Who does what** is in the live knobs: `LUNA-CAP` (Luna ceilings), `LANES.json` (Claude lanes),
+  `MULTI-SESSION.json` / `OPENCODE-FREE.json` / `BUG-PREFER.json` / `FEATURE-TIERS.json` (OpenCode/DeepSeek/MiniMax
+  routing), `DSH-HARNESS.json` / `MCODE-HARNESS.json` (harness per model).
+- **Luna pacing** (`luna_pace.py`, 2026-10-25): the usage monitor writes `LUNA-PACE.json`; it lowers `LUNA-CAP` so the
+  Codex week lasts to its reset (scoping shed first, then Luna fixers, reviews last, never below 1) and keeps Luna
+  off fixing while DeepSeek has quota. Off: `LUNA-PACE-OFF`.
+- **Fresh branches** (`qwenfix.freshen`, 2026-10-25): a reused fix branch is merged up to `FIX-BASE` before each round;
+  conflicts go to the same session. Off: `FRESHEN-OFF`.
+- **Merge train** (`merge_train.py`): due at 25 waiting or after 24 h, takes the oldest 40, skips when nothing is
+  waiting, recovers a tree left on a killed attempt. Train doctor: `train_doctor.py`.
+- **Full design** of the find-to-merge pipeline: `plans/PIPELINE-FIND-TO-MERGE.md` in the program repo.
+
+## History (2026-10-12 onwards)
+### Operation as of 2026-10-12
 
 Four Luna fix sessions, one local Qwen coder and one OpenCode free worker share one coordinator and one
 set of claimed bugs. `LOCAL-QWEN` enables the extra local session; remove it
