@@ -5,3 +5,5 @@ tests/all-sources.txt merge=union
 data/manual/index.html merge=addadd
 docs/**/*.md merge=addadd
 docs/*.md merge=addadd
+README.md merge=addadd
+tools/mcp-zene-control/zene_control/commands_snapshot.json merge=regen

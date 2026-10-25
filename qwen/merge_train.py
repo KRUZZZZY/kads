@@ -83,7 +83,9 @@ def git(*a, check=False, cwd=WT):
 def gitm(*a):
     """git with the train's merge attributes and add/add driver."""
     return ["git", "-C", str(WT), "-c", f"core.attributesFile={M / 'union.attributes'}",
-            "-c", f"merge.addadd.driver={M / 'addadd-driver.py'} %O %A %B %P", "-c", "merge.addadd.name=addadd", *a]
+            "-c", f"merge.addadd.driver={M / 'addadd-driver.py'} %O %A %B %P", "-c", "merge.addadd.name=addadd",
+            # 2026-10-25: the commands snapshot is regenerated live after the merges (snapshot_and_figures): keep ours
+            "-c", "merge.regen.driver=true", "-c", "merge.regen.name=regenerated-by-the-train", *a]
 
 
 def sh(cmd, logf, cwd=WT, timeout=6 * 3600):
