@@ -40,8 +40,14 @@ def proof_key(wt, base):
             environment.append('missing:'+str(dependency))
     environment.append(json.dumps({k:os.environ.get(k) for k in
         ('CC','CXX','CFLAGS','CXXFLAGS','LDFLAGS','PKG_CONFIG_PATH','LD_LIBRARY_PATH')},sort_keys=True))
+    # 2026-10-25 sweep: docs/ is outside the key, but negctl also runs the tests a report names - so the named set is in it
+    import negctl
+    named = set()
+    for rel in command(wt,'diff','--name-only',f'{base}..HEAD','--','docs/').splitlines():
+        if rel.endswith('.md') and (Path(wt)/rel).is_file():
+            named |= negctl.report_tests((Path(wt)/rel).read_text(errors='replace'))
     payload = [command(wt,'rev-parse',f'{base}^{{tree}}'), *entries, *environment,
-               (L.ROOT/'negctl.py').read_text()]
+               (L.ROOT/'negctl.py').read_text(), 'report-tests:'+','.join(sorted(named))]
     return hashlib.sha256('\n'.join(payload).encode()).hexdigest()
 
 

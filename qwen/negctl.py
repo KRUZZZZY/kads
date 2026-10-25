@@ -36,6 +36,48 @@ def sh(cmd, cwd, log, e, timeout=3600):
             return 124
 
 
+def report_tests(report_text):
+    """Tests a report names in `ctest -R` commands."""
+    named = set()
+    for m in re.findall(r"ctest\s+(?:-\S+\s+)*-R\s+['\"]?\^?([\w|()$^.-]+)", report_text or ""):
+        named |= {x.strip("^$()") for x in re.split(r"[|]", m)}
+    return named
+
+
+def test_executables(build):
+    """ctest name -> the executable it runs (basename). 2026-10-25 sweep: ~17 C++ tests run a binary named differently
+    (Lv2InstrumentKeyRegressionTest runs ControlDeviceCatalogueTest), so building the target named after the test left
+    the real binary stale."""
+    out = {}
+    for f in (Path(build) / "tests").rglob("CTestTestfile.cmake"):
+        try:
+            text = f.read_text(errors="replace")
+        except OSError:
+            continue
+        for name, cmd in re.findall(r'^add_test\((\S+) "([^"]+)"', text, re.M):
+            out[name] = cmd.rsplit("/", 1)[-1]
+    return out
+
+
+def build_targets(wt, tests, e):
+    """(targets to build for these tests, tests whose binary is no build target). Python tests (interpreter
+    executables) need only zene."""
+    exe = test_executables(Path(wt) / "build")
+    known = set(re.findall(r"^\.\.\. (\S+)", subprocess.run(["cmake", "--build", "build", "--target", "help"], cwd=wt,
+                                                              capture_output=True, text=True, env=e).stdout, re.M))
+    targets, missing = ["zene"], []
+    for t in tests:
+        x = exe.get(t, t)
+        if re.match(r"python|bash|sh$|env$", x):
+            continue
+        if x in known:
+            if x not in targets:
+                targets.append(x)
+        else:
+            missing.append(t)
+    return targets, missing
+
+
 def prove(wt, base, run_dir, report_text=""):
     wt, run_dir = Path(wt), Path(run_dir)
     out = run_dir / "negctl"
@@ -51,15 +93,15 @@ def prove(wt, base, run_dir, report_text=""):
         return {"ok": None, "detail": "no build tree"}
     known = set(re.findall(r"Test #\d+: (\S+)", subprocess.run(["ctest", "-N"], cwd=build / "tests", capture_output=True,
                                                                 text=True).stdout))
-    named = set()
-    for m in re.findall(r"ctest\s+(?:-\S+\s+)*-R\s+['\"]?\^?([\w|()$^.-]+)", report_text):
-        named |= {x.strip("^$()") for x in re.split(r"[|]", m)}
+    named = report_tests(report_text)
     stems = {Path(f).stem for f in test_src}
     tests = sorted(t for t in known if t in stems or t in named)
     if not tests:
         return {"ok": None, "detail": f"no ctest test matched the changed tests ({', '.join(sorted(stems))[:200]})"}
-    targets = ["zene"] + [t for t in tests if t in stems and Path(next(f for f in test_src if Path(f).stem == t)).suffix == ".cpp"]
     e = env(wt)
+    targets, missing = build_targets(wt, tests, e)
+    if missing:
+        return {"ok": None, "tests": tests, "detail": f"no build target for the binary of {', '.join(missing)} - not judged"}
     regex = "^(" + "|".join(re.escape(t) for t in tests) + ")$"
     patch = out / "product.patch"
     patch.write_text(git("diff", f"{base}..HEAD", "--", *product))

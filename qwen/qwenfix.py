@@ -1597,6 +1597,8 @@ def fix_one(job, rework_file, engine="qwen"):
         rec["integration_outside_patch"] = integration_jobs.outside_patch(item, wt, code_changed)
     rec.update(rc=rc, minutes=round((time.time() - t0) / 60, 1), head_before=head0, head_after=head1,
                commits=commits, files=changed, leftovers=bool(leftovers), qwen_verdict=verdict, finished=now())
+    if verdict and rnd > 1 and commits and str(report.relative_to(wt)) not in changed:
+        rec["report_stale"] = True      # 2026-10-25: the verdict is an earlier round's; the review brief says so
     if item.get("batch"):
         bv = batch_verdicts(report.read_text(), item) if report.exists() else {}
         rec["batch_verdicts"] = bv
@@ -2164,6 +2166,8 @@ def negctl_note(rec):
 QA_FIX = ROOT / "QA-FIX.json"
 TEST_ASSERT = re.compile(r"\b(QVERIFY\w*|QCOMPARE\w*|QTRY_\w+|QFAIL|assert\w*|ASSERT_\w+|EXPECT_\w+|CHECK\w*|REQUIRE\w*)\b")
 TEST_SKIP = re.compile(r"\b(QSKIP|QEXPECT_FAIL|DISABLED\w*|WILL_FAIL|skipTest|pytest\.(skip|xfail|mark\.skip\w*)|unittest\.skip\w*)\b")
+TEST_TRIVIAL = re.compile(r"\b(QVERIFY2?|assert|assertTrue|ASSERT_TRUE|EXPECT_TRUE|CHECK|REQUIRE)\s*\(\s*(true|True|1)\s*[,)]"
+                          r"|\bassert\s+(True|1)\b|\b(QCOMPARE|assertEqual|ASSERT_EQ|EXPECT_EQ)\s*\(\s*([^,()\s]+)\s*,\s*\5\s*\)")
 PROTECTED = re.compile(r"(^|/)[^/]*(gate|ratchet|baseline)[^/]*$|^\.github/")
 
 
@@ -2241,9 +2245,11 @@ def verify_qa_fix(rec, v, logs):
             continue
         if PROTECTED.search(f):
             return False, f"the fix touches a gate, ratchet or baseline file ({f})"
+        if not (a.isdigit() and d.isdigit()):          # numstat "-": a binary file has no line count to limit
+            return False, f"the fix changes a binary file ({f})"
         k = size["test" if f.startswith("tests/") else "product"]
         k[1] += 1
-        k[0] += (int(a) if a.isdigit() else 0) + (int(d) if d.isdigit() else 0)
+        k[0] += int(a) + int(d)
     (lines, files), (tlines, tfiles) = size["product"], size["test"]
     if (lines > int(cfg.get("max_lines", 40)) or files > int(cfg.get("max_files", 3))
             or tlines > int(cfg.get("max_test_lines", 120)) or tfiles > int(cfg.get("max_test_files", 4))):
@@ -2257,6 +2263,8 @@ def verify_qa_fix(rec, v, logs):
             return False, f"the fix leaves fewer assertions in {f}"
         if any(TEST_SKIP.search(l) for l in new):
             return False, f"the fix adds a skip or expected failure in {f}"
+        if any(TEST_TRIVIAL.search(l) for l in new):       # QCOMPARE(a, b) -> QVERIFY(true) keeps the count
+            return False, f"the fix adds an assertion that cannot fail in {f}"
     build = wt / "build"
     if not (build / "tests").is_dir():
         return False, "no build tree to rerun the focused tests in"
@@ -2266,13 +2274,21 @@ def verify_qa_fix(rec, v, logs):
     tests = sorted(named & known)
     if not tests:
         return False, f"no registered ctest test among the focused tests named ({', '.join(sorted(named))[:200] or 'none'})"
+    # 2026-10-25 sweep: a named test must exercise this branch - the proof's tests, a test file the branch changed, or a
+    # test covering a product file the reviewer changed - not any passing test (features have no red proof here)
+    whole = git(wt, "diff", "--name-only", f"{branch_base(rec)}..{head}").splitlines()
+    mine = git(wt, "diff", "--name-only", f"{base}..{head}").splitlines()
+    relevant = (set((rec.get("negctl") or {}).get("tests") or []) | {Path(f).stem for f in whole if f.startswith("tests/")}
+                | {t for f in mine if not f.startswith(("tests/", "docs/")) for _, t in tests_covering(wt, f)})
+    if not set(tests) & relevant:
+        return False, f"none of the focused tests ({', '.join(tests)[:200]}) covers this branch's changes"
     out = logs / "qa-fix"
     out.mkdir(parents=True, exist_ok=True)
     e = negctl.env(wt)
-    targets = set(re.findall(r"^\.\.\. (\S+)", subprocess.run(["cmake", "--build", "build", "--target", "help"], cwd=wt,
-                                                               capture_output=True, text=True, env=e).stdout, re.M))
-    rb = negctl.sh(["cmake", "--build", "build", "--target", "zene", *[t for t in tests if t in targets], "--", "-j4"],
-                   wt, out / "build.log", e)
+    targets, missing = negctl.build_targets(wt, tests, e)
+    if missing:
+        return False, f"no build target for the binary of {', '.join(missing)}: the test would run a stale build"
+    rb = negctl.sh(["cmake", "--build", "build", "--target", *targets, "--", "-j4"], wt, out / "build.log", e)
     if rb:
         return False, f"build failed with the fix (rc {rb}; {out / 'build.log'})"
     regex = "^(" + "|".join(re.escape(t) for t in tests) + ")$"
@@ -2297,6 +2313,9 @@ def drop_qa_fix(rec, logs):
     out.mkdir(parents=True, exist_ok=True)
     (out / "dropped.patch").write_text(git(wt, "diff", rec["head_after"], "HEAD"))
     subprocess.run([GIT, "-C", str(wt), "reset", "-q", "--hard", rec["head_after"]], capture_output=True)
+
+
+STALE_REPORT = " (from an EARLIER round: this round did not update the report, so it may not describe the current change)"
 
 
 def batch_qa_note(rec):
@@ -2326,7 +2345,7 @@ def qa_brief(rec, reviewer="luna"):
     who = f"{fixer_label(rec)} (fixer)"
     return f"""You are the QA reviewer for ONE bug-fix attempt made by {author}. Review it independently.
 Worktree: {wt}  branch {rec['branch']}. In this attempt {rtext}
-{who}'s own verdict: {rec.get('qwen_verdict')}; its report is {REPORT_DIR}/cluster-{s}.md in that tree.
+{who}'s own verdict: {rec.get('qwen_verdict')}{STALE_REPORT if rec.get('report_stale') else ''}; its report is {REPORT_DIR}/cluster-{s}.md in that tree.
 This is a {'code fix' if kind == 'fix' else 'claim with no code change (the fixer says the bug is not real / already fixed)'}.
 {batch_qa_note(rec)}{goalposts(rec)}{negctl_note(rec)}{integration_note(rec)}{rereview_note(rec)}
 Read {PROG}/AGENTS.md, then section 5 "Reviewing lane commits" of {CHECKLIST} - apply every check there.
@@ -2409,7 +2428,7 @@ def qa_brief_qwen(rec, logs):
     return f"""You are the QA reviewer for ONE bug-fix attempt made by another session. Review it independently;
 you did not write it. Verify, do not trust.
 Worktree: {wt}  branch {rec['branch']}  attempt {a[:12]}..{b[:12]}: {'; '.join(rec['commits'])}
-This is a {'code fix' if kind == 'fix' else 'claim with no code change'}. The fixer's verdict: {rec.get('qwen_verdict')}.
+This is a {'code fix' if kind == 'fix' else 'claim with no code change'}. The fixer's verdict: {rec.get('qwen_verdict')}{STALE_REPORT if rec.get('report_stale') else ''}.
 LOG FOLDER: {logs}   (every build/test log goes here as a new file; search it with fff grep)
 
 ## Rules
@@ -2450,16 +2469,20 @@ LOG FOLDER: {logs}   (every build/test log goes here as a new file; search it wi
 
 
 def parse_verdict(text):
-    blocks = re.findall(r"```json\s*(\{.*?\})\s*```", text, re.S)
-    for b in reversed(blocks):
-        try:
-            v = json.loads(b)
-            if v.get("verdict"):
-                v["verdict"] = v["verdict"].strip().upper()
-                return v
-        except json.JSONDecodeError:
-            pass
-    return None
+    """The LAST fenced block that carries a verdict, or None. 2026-10-25 sweep: a malformed final block no longer falls
+    back to an earlier one (an ACCEPT quoted mid-review would have become the verdict), and a non-object or non-string
+    verdict is no verdict instead of a crash that parked the item."""
+    blocks = [b for b in re.findall(r"```json\s*(\{.*?\})\s*```", text, re.S) if '"verdict"' in b]
+    if not blocks:
+        return None
+    try:
+        v = json.loads(blocks[-1])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(v, dict) or not isinstance(v.get("verdict"), str) or not v["verdict"].strip():
+        return None
+    v["verdict"] = v["verdict"].strip().upper()
+    return v
 
 
 def retire_tree(rec, keep_tree):
@@ -2548,13 +2571,25 @@ def qa_one(path, reviewer=None):
     elif moved and reviewer == "luna" and qa_fix_cfg():
         drop_qa_fix(rec, qa_logs)            # a stray reviewer commit without ACCEPT-FIXED: undone, review retried
     allowed_verdicts = {"ACCEPT", "ACCEPT-NOTE", "ACCEPT-FIXED", "CONFIRM", "REWORK", "DISPUTE", "REJECT"}
-    if v is None or moved or dirty or v.get("verdict") not in allowed_verdicts:
+    # 2026-10-25 sweep: a reviewer that exited with an error never accepts (a retry costs one review; once in 2,067 so far)
+    errored_accept = rc != 0 and v is not None and v.get("verdict") in ("ACCEPT", "ACCEPT-NOTE", "ACCEPT-FIXED", "CONFIRM")
+    if v is not None and v.get("verdict") in ("ACCEPT", "ACCEPT-NOTE", "CONFIRM"):
+        # an accept that lists an evidenced blocking failure contradicts itself: the evidence wins (ACCEPT-FIXED lists
+        # blockers as if unfixed, by its brief, so it is exempt)
+        good, _ = founded_rejection(v)
+        if good:
+            v = {**v, "verdict": "DISPUTE" if rec.get("kind") == "claim" else "REWORK",
+                 "summary": f"(answered {v['verdict']} but listed {len(good)} evidenced blocking failure(s)) {v.get('summary', '')}"}
+            qa.update(v)
+            log("qa", f"{s}: {rname} accepted with evidenced blockers - treated as {v['verdict']}")
+    if v is None or moved or dirty or errored_accept or v.get("verdict") not in allowed_verdicts:
         tries = rec.get("qa_failures", 0) + 1
         rec["qa_failures"] = tries
         if tries < 2:
             write_json(path, rec)  # stays pending; retried after the others
             os.utime(path)
-            log("qa", f"{s}: {rname} gave no usable verdict (rc={rc}{', HEAD moved' if moved else ''}{', dirty tree' if dirty else ''}) - will retry")
+            log("qa", f"{s}: {rname} gave no usable verdict (rc={rc}{', HEAD moved' if moved else ''}{', dirty tree' if dirty else ''}"
+                      f"{', accept from a failed run' if errored_accept else ''}) - will retry")
             return
         verdict = "QA-ERROR"
     else:
@@ -2587,13 +2622,15 @@ def qa_one(path, reviewer=None):
         log("qa", f"{s}: code verifier {verdict} ({qa['minutes']} min) - feature verifier next")
         return
     rec["outcome"] = verdict
+    # 2026-10-25 sweep: the finished record replaces the pending one in one rename (it used to move the unfinished file
+    # first), and the merge train's row is written before the state that hides the bug from the fixers
+    write_json(path, rec)
     path.replace(D["qa/done"] / path.name)
-    write_json(D["qa/done"] / path.name, rec)
     if verdict in ("ACCEPT", "ACCEPT-NOTE", "ACCEPT-FIXED", "CONFIRM"):
-        write_json(D["state"] / f"{s}.json", {**rec, "outcome": "accepted"})
         with open(ROOT / ("FEATURES-ACCEPTED.tsv" if rec.get("kind") == "feature" else "ACCEPTED.tsv"), "a") as f:
             f.write(f"{rec['cluster']}\t{rec['branch']}\t{rec['head_after'][:12]}\t{verdict}\t{rec.get('title', '')}"
                     f"\treviewed-by:{qa.get('reviewer', 'luna')}\n")
+        write_json(D["state"] / f"{s}.json", {**rec, "outcome": "accepted"})
         for b in (rec.get("item") or {}).get("batch") or []:     # same-file batch: its handled companions are accepted too
             bverdict = (rec.get("batch_verdicts") or {}).get(str(b["cluster"]))
             write_json(D["state"] / f"{slug(b['cluster'])}.json", {"cluster": b["cluster"], "outcome": "accepted",
@@ -2659,6 +2696,16 @@ def qa_guarded(path, reviewer=None):
         except Exception as e:
             log("qa", f"feature queue refresh failed: {e!r}")
     except Exception as e:
+        try:     # 2026-10-25 sweep: one retry before parking (a transient fault parked work for good)
+            rec = json.loads(path.read_text())
+            if int(rec.get("qa_driver_errors") or 0) < 1:
+                rec["qa_driver_errors"] = int(rec.get("qa_driver_errors") or 0) + 1
+                write_json(path, rec)
+                os.utime(path)
+                log("qa", f"{path.name}: driver error {e!r} - will retry once")
+                return
+        except (OSError, ValueError, AttributeError):
+            pass
         log("qa", f"{path.name}: driver error {e!r} - moved to parked")
         if path.exists():
             path.replace(D["parked"] / path.name)
