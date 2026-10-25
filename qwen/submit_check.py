@@ -102,6 +102,14 @@ def check(wt, unit, item=None):
         unreg = [f for f in new_test_files if Path(f).stem not in cm and Path(f).name not in cm]
         add("WARN" if unreg else "PASS", "new test files registered in tests/CMakeLists.txt",
             ", ".join(unreg) + " (fine only if the folder glob picks them up)" if unreg else "")
+    if not feature:         # research/code-factories: scope_guard.py, off unless qwen/SCOPE-GUARD.json enables it
+        try:
+            import scope_guard
+            verdict = scope_guard.evaluate(item, changed, git(wt, "diff", "--numstat", f"{base}..HEAD"), rtext)
+            if verdict:
+                add(verdict[0], "patch stays inside the finding's scope", verdict[1])
+        except Exception as e:      # noqa: BLE001
+            add("WARN", "scope guard", repr(e)[:120])
     # gates in one go
     try:
         rc = subprocess.run([sys.executable, str(ROOT / "feature_check.py"), str(wt)], capture_output=True, text=True)
