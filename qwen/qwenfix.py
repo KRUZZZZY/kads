@@ -62,9 +62,14 @@ def luna_cap(kind):
     """Live Luna session cap from LUNA-CAP ("fix=12 qa=5"), re-read every loop; the constants above are the fallback."""
     try:
         caps = dict(x.split("=") for x in (ROOT / "LUNA-CAP").read_text().split())
-        return max(0, int(caps[kind]))
+        ceiling = max(0, int(caps[kind]))
     except (OSError, ValueError, KeyError):
-        return LUNA_WORKERS if kind == "fix" else QA_WORKERS
+        ceiling = LUNA_WORKERS if kind == "fix" else QA_WORKERS
+    try:     # 2026-10-25: the usage monitor's pace (luna_pace.py) can only lower the owner's ceiling
+        import luna_pace
+        return luna_pace.cap(kind, ceiling)
+    except Exception:
+        return ceiling
 BUILD_JOBS = os.environ.get("QWEN_BUILD_JOBS", "6")             # initial zene build of a fresh tree
 SESSION_JOBS = os.environ.get("QWEN_SESSION_JOBS", "4")         # builds inside a Qwen/Luna session
 MAX_ROUNDS = int(os.environ.get("QWEN_MAX_ROUNDS", "2"))        # Qwen attempts per bug incl. reworks

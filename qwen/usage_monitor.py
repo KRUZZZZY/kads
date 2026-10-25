@@ -169,6 +169,11 @@ def main():
             notify(f"Luna weekly usage reached {used}%: the Luna bug sweep is stopping (finishes its slices in flight). Reviews and scoping continue.")
         elif prev.get("luna_sweep_stopped") and used >= LUNA_SWEEP_STOP:
             out["luna_sweep_stopped"] = True
+        # owner 2026-10-25: pace every Luna use so the week lasts to the reset (luna_pace.py)
+        import luna_pace
+        pace = luna_pace.step(used, cx.get("weekly_resets_at"), usage=out)
+        if pace:
+            out["luna_pace"] = {k: pace[k] for k in ("level", "why", "budget_pct_h", "burn_pct_h", "fix_factor", "scope")}
     except Exception as e:
         out["luna_error"] = repr(e)[:200]
     # 2026-10-19: place the bugs of each newly triaged patrol pass on Clef's pairwise difficulty curve

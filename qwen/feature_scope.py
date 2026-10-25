@@ -232,6 +232,13 @@ def main():
         return False
 
     while not (ROOT / "STOP-SCOPE").exists():
+        try:     # 2026-10-25: Luna pacing sheds scoping first (luna_pace.py level >= 1)
+            import luna_pace
+            if not luna_pace.scoping_allowed() and not a.only:
+                time.sleep(600)
+                continue
+        except ImportError:
+            pass
         units = {r["queue_id"]: {k: v for k, v in r.items() if k != "queue_id"}
                  for r in map(json.loads, open(PROG / "plans/queue-050.jsonl"))}
         base = (ROOT / "FIX-BASE").read_text().strip()
