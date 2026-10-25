@@ -115,6 +115,8 @@ def main():
     svc = subprocess.run(["systemctl", "--user", "is-active", "zene-fix", "zene-qa", "zene-patrol", "zene-triage", "zene-scope"],
                          capture_output=True, text=True).stdout.split()
     down = [n for n, st in zip(("fix", "qa", "patrol", "triage", "scope"), svc) if st != "active"]
+    if (ROOT / "PATROL-HOLD").exists():      # 2026-10-25: held on purpose (no bug finding), not down
+        down = [n for n in down if n not in ("patrol", "triage")]
     lanes = jload(ROOT / "LANES.json", {})
     on = [l["name"] for l in lanes.get("lanes", []) if l.get("enabled", True)]
     holds = [f.name for f in ROOT.glob("*-HOLD")]
@@ -127,6 +129,10 @@ def main():
              f"Claude lanes {'on: ' + ', '.join(on) if on else 'off'}",
              f"Usage: Claude week {cl.get('percent', '?')}%, Luna week {u.get('luna_weekly_used', '?')}%, "
              f"OpenCode Go month {go.get('percent', '?')}%"]
+    pace = (u.get("luna_pace") or {})
+    if pace:
+        lines.append(f"Luna pace: level {pace.get('level')} ({pace.get('why')}; budget {pace.get('budget_pct_h')}%/h, "
+                     f"burn {pace.get('burn_pct_h')}%/h; fixers x{pace.get('fix_factor')}, scoping {'on' if pace.get('scope') else 'paused'})")
     lines += workflow_lines(since)
     if datetime.date.today().weekday() == 0 or "--week" in sys.argv:
         lines += weekly_scorecard()

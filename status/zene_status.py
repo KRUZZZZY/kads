@@ -270,6 +270,7 @@ def collect():
     d["luna_cap"] = (Q / "LUNA-CAP").read_text().strip() if (Q / "LUNA-CAP").exists() else "?"
     d["sessions"] = processes()
     d["orch"] = jload(ORCH, {})
+    d["trains"] = train_lines()
     loop_lanes = []
     for l in (jload(Q / "LANES.json", {}) or {}).get("lanes", []):
         held = None
@@ -476,7 +477,7 @@ def text(d):
                f"last 24 h {pb['rate']} fixed (+{pb['ports']} ports), {pb['found']} new found; ETA {fmt_eta(pb['eta_days'])}")
     out.append(f"Features: {pf['done']} built, {pf['left']} left ({pct_bar(100 * pf['done'] / max(pf['done'] + pf['left'], 1))}); "
                f"last 24 h {pf['rate']} accepted; ETA {fmt_eta(pf['eta_days'])}" + (f"; {pf['goals']} parked as donation goals" if pf['goals'] else ""))
-    for t in d["orch"].get("trains", []):
+    for t in d["trains"]:
         out.append(f"Train: {t}")
     out.append(f"Clef re-triage: {d['clef']}")
     out.append(f"Scoping ({d['briefs']} briefs): {d['scope']}")
@@ -484,6 +485,20 @@ def text(d):
     out += [f"  {t:%H:%M} {m[:150]}" for t, m in d["events"]]
     return "\n".join(out)
 
+
+
+def train_lines():
+    """2026-10-25: the live train from FIX-BASE and the merge-train log (ORCH-STATUS.json "trains" was hand-written
+    and went stale for a week)."""
+    out = []
+    try:
+        base = (Q / "FIX-BASE").read_text().strip()
+        out.append(f"{base} is the fix base since {time.strftime('%a %d %b %H:%M', time.localtime((Q / 'FIX-BASE').stat().st_mtime))}")
+        last = [l for l in (Q / "logs/merge-train.log").read_text().splitlines() if l.strip()][-1:]
+        out += [f"last merge-train line: {l[:160]}" for l in last]
+    except (OSError, IndexError):
+        pass
+    return out
 
 CSS = """
 body { background:#14161a; color:#d7dae0; font-family:'Noto Sans',sans-serif; font-size:10.5pt; }
@@ -607,7 +622,7 @@ def page(d):
     h.append(f"<tr><th>All time</th><td>{d['accepted_total']} fix verdicts accepted/confirmed, {d['features_total']} features accepted</td></tr>")
     h.append(f"<tr><th>Queues</th><td>QA pending {d['qa_pending']} · reworks {d['rework']} · features for OpenCode {len(d['fq'])} · "
              f"Claude queue {len(d['cq'])} ({sum(r.get('tier') == 'sonnet' for r in d['cq'])} Sonnet, {sum(r.get('tier') == 'opus' for r in d['cq'])} Opus)</td></tr>")
-    for t in d["orch"].get("trains", []):
+    for t in d["trains"]:
         h.append(f"<tr><th>Train</th><td>{esc(t)}</td></tr>")
     h.append(f"<tr><th>Clef re-triage</th><td class='dim'>{esc(d['clef'])}</td></tr>")
     h.append(f"<tr><th>Scoping briefs</th><td class='dim'>{d['briefs']} written · {esc(d['scope'])}</td></tr>")
