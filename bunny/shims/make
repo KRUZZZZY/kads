@@ -1,0 +1,10 @@
+#!/bin/bash
+args=(); tgt=0; skip=
+for a in "$@"; do
+  if [ "$skip" = arg ]; then args+=("$a"); skip=; continue; fi
+  if [ "$skip" = jobs ]; then skip=; [[ "$a" =~ ^[0-9]+$ ]] && continue; fi
+  case "$a" in -j|--jobs) skip=jobs; continue;; -j*|--jobs=*) continue;; -C|-f) args+=("$a"); skip=arg; continue;; -*) args+=("$a"); continue;; *=*) args+=("$a"); continue;; all|install|clean|package) echo "bunny-guard: make target '$a' not allowed" >&2; exit 97;; *) tgt=1; args+=("$a");; esac
+done
+[ $tgt = 1 ] || { echo "bunny-guard: name a target (cmake --build build --target <t>)" >&2; exit 97; }
+JS=$HOME/.local/share/zene-bunny-fix/bunny
+exec /usr/bin/python3 "$JS/build_guard.py" -- /usr/bin/make "${args[@]}"

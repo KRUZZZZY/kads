@@ -1,0 +1,17 @@
+#!/bin/bash
+# Bunny lane guard: blocks repo-wide or outward git operations.
+REAL=/usr/bin/git
+sub=""; for a in "$@"; do case "$a" in -C|-c) skipnext=1; continue;; esac; if [ -n "$skipnext" ]; then skipnext=; continue; fi; case "$a" in -*) continue;; esac; sub="$a"; break; done
+deny() { echo "bunny-guard: 'git $*' is not allowed in a Bunny lane (AGENTS.md rules 1, 2, 11, 12). Stage explicit paths and commit on your own branch only." >&2; exit 97; }
+case "$sub" in
+  push|tag|worktree|rebase|remote|filter-branch|filter-repo|replace|gc|prune|update-ref|stash|switch|merge|cherry-pick|revert|pull|fetch|clone|submodule) deny "$@";;
+  config) for a in "$@"; do case "$a" in --get|--get-all|--list|-l) exec $REAL "$@";; esac; done; deny "$@";;
+  branch) for a in "$@"; do case "$a" in -d|-D|-m|-M|-f|--force|--delete|--move|-c|-C|--set-upstream-to|-u) deny "$@";; esac; done;;
+  checkout) for a in "$@"; do case "$a" in -b|-B|--orphan|--detach) deny "$@";; esac; done
+            # allow only path checkouts: 'git checkout -- <paths>' or 'git checkout HEAD -- <paths>'
+            printf '%s\n' "$@" | grep -qx -- '--' || deny "$@";;
+  reset) for a in "$@"; do case "$a" in --hard|--merge|--keep) deny "$@";; esac; done;;
+  clean) deny "$@";;
+  add) for a in "$@"; do case "$a" in -A|--all|.|-u|--update|:/) deny "$@";; esac; done;;
+esac
+exec $REAL "$@"

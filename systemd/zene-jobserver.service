@@ -1,0 +1,10 @@
+[Unit]
+Description=Zene machine-wide make jobserver (shared compile-job pool for every agent build)
+
+[Service]
+ExecStart=/usr/bin/python3 /home/kruzzzzy/.local/share/zene-bunny-fix/bunny/jobserver.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

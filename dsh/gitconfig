@@ -1,0 +1,8 @@
+# Git config for DeepSeek Harness fix sessions (run-dsh.sh sets GIT_CONFIG_GLOBAL to this file).
+# Pushing is impossible: every push URL is rewritten to an invalid one. The user's own settings still apply.
+[include]
+	path = ~/.gitconfig
+[url "invalid://no-push/"]
+	pushInsteadOf = https://
+	pushInsteadOf = git@
+	pushInsteadOf = ssh://

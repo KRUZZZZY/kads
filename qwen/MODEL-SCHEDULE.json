@@ -1,0 +1,30 @@
+{
+ "_note": "Owner 2026-10-19: 'make sure that deepseek cannot run during peak hours ... build something that allows for scheduling'. Read live by opencode_free.py (off_schedule): a model inside one of its blocked windows - or within lead_minutes before one - counts as resting, so no new session starts on it; a session already running is not stopped. Times are in the window's tz; days are Mon..Sun names or ranges (Mon-Fri). Add a model by copying an entry. DeepSeek peak (OpenCode Go docs, https://opencode.ai/v2/docs/console/go/ and DeepSeek's pricing page): 01:00-04:00 and 06:00-10:00 UTC, Monday to Friday; weekends are off-peak (Chinese public holidays are also off-peak but are not modelled - those days simply stay blocked).",
+ "lead_minutes": 45,
+ "models": {
+  "opencode-go/deepseek-v4.1-flash": {
+   "tz": "UTC",
+   "blocked": [
+    {"days": "Mon-Fri", "from": "01:00", "to": "04:00"},
+    {"days": "Mon-Fri", "from": "06:00", "to": "10:00"}
+   ],
+   "why": "DeepSeek peak hours (double price; Go meters it higher)"
+  },
+  "opencode-go/deepseek-v4-pro": {
+   "tz": "UTC",
+   "blocked": [
+    {"days": "Mon-Fri", "from": "01:00", "to": "04:00"},
+    {"days": "Mon-Fri", "from": "06:00", "to": "10:00"}
+   ],
+   "why": "DeepSeek peak hours (double price; Go meters it higher)"
+  },
+  "opencode/deepseek-v4.1-flash": {
+   "tz": "UTC",
+   "blocked": [
+    {"days": "Mon-Fri", "from": "01:00", "to": "04:00"},
+    {"days": "Mon-Fri", "from": "06:00", "to": "10:00"}
+   ],
+   "why": "DeepSeek peak hours (Zen paid route)"
+  }
+ }
+}

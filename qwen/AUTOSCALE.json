@@ -1,0 +1,15 @@
+{
+ "enabled": true,
+ "haiku_review_min": 0,
+ "haiku_review_max": 3,
+ "haiku_review_per_backlog": 3,
+ "backlog_slow": 12,
+ "backlog_hold": 24,
+ "ram_floor_gb": 4.0,
+ "ram_haiku_gb": 2.5,
+ "ram_free_model_gb": 2.5,
+ "ram_luna_gb": 1.5,
+ "note": "2026-10-15: ram_haiku_gb 7 -> 2.5 after haiku-exec turned off the clangd-lsp plugin per session (measured: no clangd); 2026-10-20 owner 'let luna autoscale to meet the review requirements': one Luna reviewer per review waiting or running, min 1, max LUNA-CAP qa (6)",
+ "luna_review_min": 1,
+ "luna_review_per_backlog": 1
+}

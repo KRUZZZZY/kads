@@ -1,0 +1,7 @@
+#!/bin/bash
+# Bunny lane guard: bounded ripgrep. Agents get at most 120 lines; use mcp__fff__grep first.
+LIM=${BUNNY_RG_LINES:-120}
+tmp=$(mktemp); /usr/bin/rg --max-columns 300 --max-columns-preview "$@" > "$tmp"; rc=$?
+n=$(wc -l < "$tmp"); head -n "$LIM" "$tmp"; rm -f "$tmp"
+[ "$n" -gt "$LIM" ] && echo "[bunny-guard: $((n-LIM)) more lines cut. Narrow the path/glob (-g), add -l or --max-count, or use mcp__fff__grep / multi_grep with path=<worktree>.]"
+exit $rc

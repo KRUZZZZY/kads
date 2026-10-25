@@ -1,0 +1,47 @@
+{
+ "_note": "Claude feature lanes of the fix loop (owner 2026-10-19). Read live by qwenfix.py; edit by hand or with lanes.py. Each lane runs one unit at a time and stays busy while that unit is in review or rework. Tiers 'bug' / 'bug-hard' (2026-10-19): bugs escalated past the OpenCode fixers (BUG-ESCALATIONS.json levels 2 and 3). max_concurrent (2026-10-19 owner: 'go back to only one claude lane'): at most this many lanes open at once. 2026-10-19 ~14:30 owner: 'stop the claude lanes, this account is just being used to supervise' - all lanes disabled until the owner says. 2026-10-19 ~17:15 owner: 'allow singular claude lanes' - both lanes enabled, max_concurrent 1 (one Claude unit open at a time). 2026-10-19 ~21:45 owner: 'Dont start a claude lane, disable that for now, swapped account' - all lanes disabled. 2026-10-20 ~01:15 owner: 'do the haiku thing, but only with bugs, and stop the sonnet feature lane temporarily' - haiku-bugs lane (untouched bugs, BUG-RANK pct <= 0.5, reworks return to it); sonnet-1 off; opus-1 left off while the owner decides (with max_concurrent 1 its held Q050-183 would block the Haiku lane). 2026-10-20 ~17:45 owner: 'get a sonnet lane working on features again, or 2' - sonnet-1 enabled, sonnet-2 added (same tiers), max_concurrent 1 -> 3 so the Haiku bug lane does not block them; opus-1 stays off. sonnet-2 tiers -> ['sonnet'] (features only); sonnet-1 keeps 'bug' for the 12 bugs escalated to level 2, which lanes take first. 2026-10-21 01:00 (scheduled, owner 2026-10-20): all Claude lanes disabled after the weekly reset. 2026-10-21 09:03 owner 'You can resume claude sessions': sonnet-1, sonnet-2 and haiku-bugs enabled again (opus-1 stays off). 2026-10-21 09:13 owner 'only 1 sonnet lane after one of these are done': both Sonnet lanes drain (tiers ['drain']: finish their held unit, take nothing new); sonnet-handoff.py (timer zene-sonnet-handoff, every 3 min) disables whichever finishes first and restores the other's tiers. 2026-10-21 09:48 sonnet-handoff: sonnet-2 finished its unit and is disabled; sonnet-1 continues as the one Sonnet lane (tiers ['sonnet', 'bug']). 2026-10-22 00:02 owner 'stop the bug fix lanes for claude, just do feature lanes': haiku-bugs disabled; sonnet-1 tiers ['sonnet'] (no 'bug' escalations). Level-2/3 bug escalations now wait for a Claude lane. 2026-10-24 owner: replace Sonnet 5.5 high with Opus 5.5 medium in all cases. Existing lane names and tier assignments remain stable; both former Sonnet lanes now select Opus medium.",
+ "lanes": [
+  {
+   "name": "sonnet-1",
+   "model": "claude-opus-5-5",
+   "effort": "medium",
+   "tiers": [
+    "sonnet"
+   ],
+   "enabled": true
+  },
+  {
+   "name": "opus-1",
+   "model": "claude-opus-5-5",
+   "effort": "high",
+   "tiers": [
+    "opus",
+    "bug-hard"
+   ],
+   "enabled": false
+  },
+  {
+   "name": "haiku-bugs",
+   "model": "claude-haiku-5-5",
+   "effort": "high",
+   "tiers": [
+    "bug-easy"
+   ],
+   "bug_queue": {
+    "max_pct": 0.5,
+    "tier": "bug-easy"
+   },
+   "enabled": false
+  },
+  {
+   "name": "sonnet-2",
+   "model": "claude-opus-5-5",
+   "effort": "medium",
+   "tiers": [
+    "sonnet"
+   ],
+   "enabled": false
+  }
+ ],
+ "max_concurrent": 3
+}

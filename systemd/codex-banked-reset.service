@@ -1,0 +1,9 @@
+[Unit]
+Description=Redeem available banked Codex resets whenever weekly allowance reaches zero
+ConditionPathExists=/home/kruzzzzy/.local/share/codex-banked-reset/armed
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/kruzzzzy/.local/share/codex-banked-reset/watch.py run
+Environment=PATH=/home/kruzzzzy/.local/bin:/home/kruzzzzy/.hermes/node/bin:/usr/local/bin:/usr/bin:/bin
+TimeoutStartSec=180

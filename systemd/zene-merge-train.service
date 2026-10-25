@@ -1,0 +1,10 @@
+[Unit]
+Description=Zene automatic merge train (runs when enough accepted work is waiting)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kruzzzzy/Documents/AI_KOS_PROJECT/projects/zene-studio-program/zene-cachyos
+Environment=PATH=/home/kruzzzzy/.local/bin:/home/kruzzzzy/.hermes/node/bin:/usr/local/bin:/usr/bin:/bin
+Environment=LANG=en_GB.UTF-8
+ExecStart=/usr/bin/python3 /home/kruzzzzy/.local/share/zene-bunny-fix/qwen/merge_train.py
+TimeoutStartSec=12h

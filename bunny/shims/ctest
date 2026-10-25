@@ -1,0 +1,5 @@
+#!/bin/bash
+# Bunny lane guard: targeted test runs only (-R/-I); full suites are run by the parent, one at a time.
+printf '%s\n' "$@" | grep -qE '^(-R|--tests-regex|-I|--tests-information|-N|--show-only.*|--help|--version)$|^-R.+' || { echo "bunny-guard: run named tests: ctest -R '<regex>' --output-on-failure (from <build>/tests)" >&2; exit 97; }
+case "$PWD" in */build/tests|*/build/tests/*) ;; *) echo "bunny-guard: run ctest from <lane>/build/tests (AGENTS.md rule 7)" >&2; exit 97;; esac
+exec /usr/bin/ctest --timeout 900 "$@"

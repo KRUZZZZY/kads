@@ -1,0 +1,23 @@
+[Unit]
+Description=Zene fix loop (bugs + features + Claude lanes); graceful restart = touch qwen/STOP-FIX
+After=network-online.target
+
+[Service]
+Environment=TMPDIR=%h/.cache/zene-tmp
+WorkingDirectory=/home/kruzzzzy/Documents/AI_KOS_PROJECT/projects/zene-studio-program
+Environment=PATH=/home/kruzzzzy/.local/bin:/home/kruzzzzy/.hermes/node/bin:/usr/local/bin:/usr/bin:/bin:/opt/cuda/bin
+Environment=LANG=en_GB.UTF-8
+Environment=QWEN_QA_WORKERS=2
+Environment=QWEN_LUNA_WORKERS=4
+Environment=BUNNY_SLOTS=2
+Environment=QWEN_ENGINE=luna
+ExecStartPre=/usr/bin/rm -f /home/kruzzzzy/.local/share/zene-bunny-fix/qwen/STOP-FIX
+ExecStart=/usr/bin/python3 /home/kruzzzzy/.local/share/zene-bunny-fix/qwen/qwenfix.py fix
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/kruzzzzy/.local/share/zene-bunny-fix/qwen/logs/fix.out
+StandardError=append:/home/kruzzzzy/.local/share/zene-bunny-fix/qwen/logs/fix.out
+TimeoutStopSec=60
+
+[Install]
+WantedBy=default.target

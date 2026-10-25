@@ -1,0 +1,1 @@
+{"tokens": 4, "max_builds": 2, "max_jobs": 6, "nice": 10, "min_free_gb": 4.0, "reserve_gb_per_token": 1.0, "_note": "2026-10-24: two root builds plus four shared tokens = at most six make jobs. Refill only when idle; reserve CPU for the desktop."}

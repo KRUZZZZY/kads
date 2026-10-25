@@ -1,0 +1,15 @@
+#!/bin/bash
+# Bunny lane guard: targeted builds only, capped parallelism, no reconfigure of other trees.
+REAL=/usr/bin/cmake
+if [ "$1" = "--build" ]; then
+  printf '%s\n' "$@" | grep -qE '^(--target|-t)$' || { echo "bunny-guard: build a named target: cmake --build build --target <zene|SomeTest> (full builds are the parent's job)" >&2; exit 97; }
+  args=(); skip=; for a in "$@"; do
+    if [ -n "$skip" ]; then skip=; [[ "$a" =~ ^[0-9]+$ ]] && continue; fi
+    case "$a" in -j|--parallel) skip=1; continue;; -j[0-9]*|--parallel=*) continue;; --) continue;; esac
+    case "$a" in all|install|package|clean) echo "bunny-guard: target '$a' not allowed" >&2; exit 97;; esac
+    args+=("$a"); done
+  JS=$HOME/.local/share/zene-bunny-fix/bunny
+  exec /usr/bin/python3 "$JS/build_guard.py" -- "$REAL" "${args[@]}"
+fi
+case " $* " in *" -E "*|*" --version "*|*" --help"*|*" -P "*) exec $REAL "$@";; esac
+echo "bunny-guard: configuring is the parent's job; the lane build tree is already configured. Use 'cmake --build build --target <t>'." >&2; exit 97

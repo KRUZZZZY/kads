@@ -1,0 +1,19 @@
+[Unit]
+Description=Zene Clef triage of finished patrol passes (dedup, realness, difficulty)
+
+[Service]
+WorkingDirectory=/home/kruzzzzy/Documents/AI_KOS_PROJECT/projects/zene-studio-program
+Environment=PATH=/home/kruzzzzy/.local/bin:/home/kruzzzzy/.hermes/node/bin:/usr/local/bin:/usr/bin:/bin:/opt/cuda/bin
+Environment=LANG=en_GB.UTF-8
+Environment=QWEN_QA_WORKERS=2
+Environment=QWEN_LUNA_WORKERS=4
+Environment=BUNNY_SLOTS=2
+Environment=QWEN_ENGINE=luna
+ExecStart=/home/kruzzzzy/.local/share/zene-bunny-fix/clef-venv/bin/python tools/luna-patrol/triage_new.py --watch
+Restart=on-failure
+RestartSec=120
+StandardOutput=append:/home/kruzzzzy/Documents/AI_KOS_PROJECT/projects/zene-studio-program/research/reviews/luna-new-triage/watch.log
+StandardError=append:/home/kruzzzzy/Documents/AI_KOS_PROJECT/projects/zene-studio-program/research/reviews/luna-new-triage/watch.log
+
+[Install]
+WantedBy=default.target

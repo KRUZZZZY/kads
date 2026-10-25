@@ -1,0 +1,12 @@
+ScriptDawRemovalUndoTest
+ScriptMemoryBudgetTest
+ControlRenderSurround
+ControlAbsentSocket
+ControlSocketPathSafety
+ControlMcpGroupCoverage
+MmpzGitDepthTest
+AafImportMenuTest
+ReferenceProjectPanelTest
+AbletonLinkSessionTest
+CarlaMidiHandoffTest
+ControlStemExportVerb

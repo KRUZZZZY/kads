@@ -1,0 +1,8 @@
+[Unit]
+Description=Zene fix-workflow autopilot (recovers held issues within limits, tunes the train, alerts only on stalls)
+
+[Service]
+Type=oneshot
+Environment=PATH=/home/kruzzzzy/.local/bin:/home/kruzzzzy/.hermes/node/bin:/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=/home/kruzzzzy/.local/share/zene-bunny-fix/qwen
+ExecStart=/usr/bin/python3 /home/kruzzzzy/.local/share/zene-bunny-fix/qwen/autopilot.py

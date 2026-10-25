@@ -1,0 +1,9 @@
+{
+ "_note": "Owner 2026-10-20: 'allow the luna reviewers to fix small problems, iff the focused tests pass'. Read live by qwenfix.py (qa_fix_cfg). Luna may commit one small fix on top of the branch and answer ACCEPT-FIXED; the loop then checks size, protected files, assertions and skips, rebuilds and reruns the focused tests (and the red proof for bug fixes) before it counts, else drops the commit and the verdict becomes REWORK. enabled false = reviewers never commit. 2026-10-20 (2nd): for bugs Luna may also fix what it would REWORK/REJECT, and fix a disputed not-a-bug claim; max_lines/max_files are product code, max_test_lines/max_test_files the tests and registrations; every bug fix must pass the red proof.",
+ "enabled": true,
+ "max_lines": 40,
+ "max_files": 3,
+ "max_commits": 2,
+ "max_test_lines": 120,
+ "max_test_files": 4
+}

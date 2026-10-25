@@ -1,0 +1,10 @@
+[Unit]
+Description=Check OpenCode Go and Claude usage every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+Unit=zene-usage-monitor.service
+
+[Install]
+WantedBy=timers.target

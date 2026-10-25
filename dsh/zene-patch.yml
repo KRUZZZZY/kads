@@ -1,0 +1,44 @@
+# Zene fix loop overlay for dsh headless: DeepSeek V4.1 Flash served by OpenCode Go (OpenAI-compatible), no telemetry,
+# no extra title calls. The key comes from OPENCODE_GO_API_KEY, set by run-dsh.sh.
+# 2026-10-22 (owner A/B test): a second provider, OpenDesign (OPENDESIGN_API_KEY, from ~/.config/open-design/key); each
+# session's provider comes from ZENE_DSH_PROVIDER, chosen per job by qwen/opencode_free.run_model_dsh.
+- id: llm-pi-ai
+  config:
+    providers:
+      opencode-go:
+        displayName: OpenCode Go
+        apiKeyEnv: OPENCODE_GO_API_KEY
+        api: openai-completions
+        baseURL: https://opencode.ai/zen/go/v1
+        headers:
+          User-Agent: zene-fix-loop/1.0
+          # OpenCode Go asks for a stable per-conversation id (opencode.ai/docs/go "Where can I use it?"); run-dsh.sh
+          # sets one per fix session and reuses it when the session is resumed
+          x-opencode-session: !!js process.env.ZENE_OPENCODE_SESSION
+        compat:
+          thinkingFormat: deepseek
+        models:
+          - id: deepseek-v4.1-flash
+            name: DeepSeek V4.1 Flash (OpenCode Go)
+            contextWindow: 1000000
+      opendesign:
+        displayName: OpenDesign
+        apiKeyEnv: OPENDESIGN_API_KEY
+        api: openai-completions
+        baseURL: https://amr-link.open-design.ai/v1
+        headers:
+          User-Agent: zene-fix-loop/1.0
+        compat:
+          thinkingFormat: deepseek
+        models:
+          - id: deepseek-v4.1-flash
+            name: DeepSeek V4.1 Flash (OpenDesign)
+            contextWindow: 1000000
+- id: agent-default-model
+  config:
+    provider: !!js process.env.ZENE_DSH_PROVIDER || 'opencode-go'
+    model: deepseek-v4.1-flash
+- id: session-title-llm
+  disabled: true
+- id: session-telemetry-otel
+  disabled: true

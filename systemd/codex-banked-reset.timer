@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Codex weekly allowance every minute
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=60
+AccuracySec=1
+Unit=codex-banked-reset.service
+
+[Install]
+WantedBy=timers.target

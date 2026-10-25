@@ -1,0 +1,7 @@
+[Unit]
+Description=Zene daily digest to Telegram
+
+[Service]
+Type=oneshot
+Environment=PATH=/home/kruzzzzy/.local/bin:/home/kruzzzzy/.hermes/node/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 /home/kruzzzzy/.local/share/zene-bunny-fix/qwen/digest.py

@@ -1,0 +1,7 @@
+tests/** merge=addadd
+tests/upstream-modifications.txt merge=union
+tests/fork-sources.txt merge=union
+tests/all-sources.txt merge=union
+data/manual/index.html merge=addadd
+docs/**/*.md merge=addadd
+docs/*.md merge=addadd

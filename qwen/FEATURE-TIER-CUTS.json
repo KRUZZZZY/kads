@@ -1,0 +1,6 @@
+{
+ "free_below": 0.0,
+ "muse_below": 0.65,
+ "sonnet_below": 0.9,
+ "_why": "owner 2026-10-19: scale tiers down (was ~0.32 / 0.92, no Opus start); 2026-10-19 owner stopped Mimo feature building: no bottom tier"
+}

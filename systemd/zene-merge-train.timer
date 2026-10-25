@@ -1,0 +1,10 @@
+[Unit]
+Description=Check every 3 hours whether a merge train is due
+
+[Timer]
+OnBootSec=30min
+OnUnitActiveSec=3h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

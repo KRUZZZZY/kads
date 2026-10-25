@@ -1,0 +1,10 @@
+{
+ "_note": "Monthly subscription prices (USD). go_plan: 'go' ($10) or 'go_plus' ($40) - set the one you pay for. 2026-10-19: owner confirmed the plan is Go ($10/month).",
+ "claude_monthly": 200,
+ "luna_monthly": 20,
+ "go_plan": "go",
+ "go_monthly": {
+  "go": 10,
+  "go_plus": 40
+ }
+}

@@ -1,0 +1,24 @@
+#!/bin/bash
+# Qwen sessions: lean mcode data dir (fff is the only MCP server; no skills, plugins, agents or integrations).
+# Retries a run that failed on a transient upstream error and changed nothing in its worktree.
+export MINIMAX_DATA_DIR=/home/kruzzzzy/.local/share/zene-bunny-fix/qwen/mcode-data
+REAL=/home/kruzzzzy/.minimax-code/bin/mcode
+[ "$1" = "exec" ] || exec "$REAL" "$@"
+cwd=""; prev=""; for a in "$@"; do [ "$prev" = "--cwd" ] && cwd="$a"; prev="$a"; done
+input=$(mktemp); out=$(mktemp); trap 'rm -f "$input" "$out"' EXIT
+cat > "$input"
+state() { [ -n "$cwd" ] && { /usr/bin/git -C "$cwd" rev-parse HEAD; /usr/bin/git -C "$cwd" status --porcelain; } 2>/dev/null; }
+before=$(state)
+for attempt in 1 2 3 4; do
+  "$REAL" "$@" < "$input" > "$out" 2>&1; rc=$?
+  cat "$out"
+  [ $rc -eq 0 ] && exit 0
+  # An exhausted reasoning turn is a model failure, not a recovered connection.
+  # Let the driver record it and start the next attempt with adaptive settings.
+  grep -qi 'without a final assistant response' "$out" && exit $rc
+  grep -qiE 'upstream error|Stream ended|connection|timed? ?out|ECONNRESET|socket hang up|rate.?limit|429|502|503|504' "$out" || exit $rc
+  [ "$(state)" = "$before" ] || exit $rc
+  [ $attempt -lt 4 ] || exit $rc
+  echo "bunny-mcode-shim: transient failure (rc=$rc), worktree unchanged; retry $attempt after $((90*attempt))s"
+  sleep $((90*attempt))
+done

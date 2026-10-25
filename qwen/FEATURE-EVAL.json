@@ -1,0 +1,10 @@
+{
+ "started": "2026-10-19T02:07:00",
+ "models": [],
+ "target_decided_per_model": 10,
+ "hold_exempt": false,
+ "why": "owner 2026-10-19: bottom feature tier, Mimo V2.6 Flash (cheaper) vs GLM 5.3 Flash (best earlier feature rate); both at their top reasoning (Mimo high, GLM max), scoping briefs on",
+ "ended": "2026-10-19T09:39:28",
+ "winner": "opencode-go/mimo-v2.6-flash",
+ "result": "11 decided each: Mimo 27% accepted (33% first pass), GLM 9% (0% first pass); Mimo also half the output tokens per accepted feature (444k vs 895k)"
+}

@@ -1,0 +1,10 @@
+{
+ "_note": "Owner 2026-10-20: 'run deepseek provided by opencode in the deepseek harness instead of the opencode harness'. Models listed here run through DeepSeek Harness (dsh 0.2.1-rc.2, headless, ~/.local/share/zene-bunny-fix/dsh/run-dsh.sh) instead of `opencode run`; read live by opencode_free.uses_dsh(). Same provider (OpenCode Go, OpenCode's own key), same Go-plan usage. Remove a model (or this file) to go back to OpenCode. Benchmark rows show '[DeepSeek Harness]'. 2026-10-22 owner A/B test: DeepSeek V4.1 Flash served by two providers inside DeepSeek Harness - OpenCode Go and OpenDesign (https://amr-link.open-design.ai/v1, key in ~/.config/open-design/key). Each new session gets a provider by these weights (a rework stays on its session's provider); a provider that fails or hits a limit rests alone while the other takes over. Benchmark rows '[DeepSeek Harness]' vs '[DeepSeek Harness \u00b7 OpenDesign]'.",
+ "models": [
+  "opencode-go/deepseek-v4.1-flash"
+ ],
+ "providers": {
+  "opencode-go": 1,
+  "opendesign": 1
+ }
+}

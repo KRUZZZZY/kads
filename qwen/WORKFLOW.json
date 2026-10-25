@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "started_at": "2026-10-24T17:31:06",
+  "implementation_attempts_per_checkpoint": 2,
+  "max_new_model_sessions": 8,
+  "max_diagnostics": 2,
+  "max_integration_sessions": 2,
+  "enabled": true,
+  "note": "Owner-authorized 2026-10-24 workflow: original issue IDs and all historical usage are preserved. Existing sessions are grandfathered; post-deployment work/diagnostic/repair sessions share one budget across aliases and models. Reviews are tracked separately. No unchanged build retry.",
+  "activated_at": "2026-10-24T18:21:22"
+}

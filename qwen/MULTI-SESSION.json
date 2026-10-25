@@ -1,0 +1,13 @@
+{
+ "_note": "Owner 2026-10-18: 'beam ... is not rate limited, so use that constantly' and DeepSeek V4.1 Flash 1017 ('roughly opus 5 levels in coding') on bugs. Sessions each model may run at once; read live by opencode_free.claim()/workers(). Autoscaler RAM limits still apply. 2026-10-18: mimo-v2.6-flash x3 so the bottom feature tier can run more than one unit. 2026-10-19: glm-5.3-flash x3 for the bottom-tier eval. 2026-10-19: GLM dropped after the eval. 2026-10-19: DeepSeek V4.1 Flash 1017 x2 for the middle feature tier. 2026-10-19 20:3x: DeepSeek x3 - it now takes bugs as well as the middle feature tier. 2026-10-19 21:0x: DeepSeek back to x2 (owner's theoretical max: 3 MiniMax, 1 Claude, 1 OpenCode free, 2 DeepSeek, 2 Luna reviews, 1 Strata). 2026-10-20 owner: '2 bugfixing deepseek lanes' + keep features -> DeepSeek x4, split by kind_sessions: the first 2 slots take features only, the other 2 bugs only (opencode_free.slot_range). 2026-10-21 owner: beam disabled (its 4 sessions dropped); MiniMax M3.1 free 3 -> 5. 2026-10-22: OpenDesign adds a second DeepSeek provider - DeepSeek 4 -> 6 sessions (3 feature + 3 bug). 2026-10-24 owner: 'is minimax no longer free? swap it all back to beam' - MiniMax M3.1 free is gone from OpenCode's list (only paid opencode-go/minimax-m3.1-flash remains); DeepSeek is out of quota on both providers (OpenCode Go monthly until 15 Nov, OpenDesign 402 insufficient_balance until 2026-10-28 23:30 UTC). opencode-go/beam-free (answered PONG 2026-10-24) replaces MiniMax: beam x5 (2 feature + 3 bug slots).",
+ "opencode-go/deepseek-v4.1-flash": 6,
+ "kind_sessions": {
+  "opencode-go/deepseek-v4.1-flash": {
+   "feature": 3
+  },
+  "opencode-go/beam-free": {
+   "feature": 2
+  }
+ },
+ "opencode-go/beam-free": 5
+}

@@ -1,0 +1,4 @@
+{
+ "_note": "Owner 2026-10-20: 'we have enough data backloged for opencode, just move all of it to mcode' - models listed here run through MiniMax Code (../mcode/run-mcode.sh) instead of OpenCode; read live by opencode_free.uses_mcode. Remove a model to send it back to OpenCode. 2026-10-24: MiniMax M3.1 free removed (no longer offered).",
+ "models": []
+}

@@ -1,0 +1,28 @@
+# MiniMax Code (mcode) profile for the Zene fix loop (owner 2026-10-20: "move all of [MiniMax M3.1 Flash] to mcode").
+# Read by run-mcode.sh with MINIMAX_DATA_DIR=./data (fff is the only MCP server there; the owner's ~/.minimax is
+# untouched). The key and the per-conversation OpenCode Go session id come from the environment, never this file.
+agents:
+  default:
+    modelConfigId: custom_provider:opencode-go/minimax-m3.1-flash-free
+    skills: []
+permissionMode: bypassPermissions
+logLevel: info
+custom_provider:
+  opencode-go:
+    name: opencode-go
+    kind: custom
+    api: openai-completions
+    enabled: true
+    options:
+      baseURL: https://opencode.ai/zen/go/v1
+      apiKey: "${OPENCODE_GO_API_KEY}"
+      authMode: api-key
+      headers:
+        User-Agent: zene-fix-loop/1.0
+        x-opencode-session: "${ZENE_OPENCODE_SESSION}"
+    models:
+      minimax-m3.1-flash-free:
+        reasoning: true
+        tool_call: true
+        attachment: false
+        limit: {context: 1000000, output: 32000}

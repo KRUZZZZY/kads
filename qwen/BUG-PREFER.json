@@ -1,0 +1,13 @@
+{
+ "_note": "Owner 2026-10-18: bug jobs try these first (after the BUG-TRIAL pick). DeepSeek: OpenCode Go 'deepseek-v4.1-flash' - DeepSeek shipped V4.1-Flash-1017 in place on 2026-10-17; whether the Go route serves 1017 yet is not confirmed (metadata still says 2026-09-10, no separate 1017 id on Go or Command Code).",
+ "models": [
+  "opencode-go/deepseek-v4.1-flash"
+ ],
+ "_2026-10-19": "space-bunny-free added (81% on 16 bugs, best free Zen model; shares the one free channel with mimo-free)",
+ "_2026-10-19b": "owner: no paid OpenCode - DeepSeek removed",
+ "_2026-10-19c": "owner: 'deepseek shouldn't be excluded from bug fixing' - DeepSeek V4.1 Flash 1017 (Go) first; it also builds the middle feature tier",
+ "_2026-10-20": "owner: 'through zen only use mimo 2.6 flash free' - space-bunny-free removed",
+ "_2026-10-21": "owner: beam disabled, MiniMax only",
+ "_2026-10-24": "2026-10-24 owner: 'is minimax no longer free? swap it all back to beam' - MiniMax M3.1 free is gone from OpenCode's list (only paid opencode-go/minimax-m3.1-flash remains); DeepSeek is out of quota on both providers (OpenCode Go monthly until 15 Nov, OpenDesign 402 insufficient_balance until 2026-10-28 23:30 UTC). opencode-go/beam-free (answered PONG 2026-10-24) replaces MiniMax; beam first while DeepSeek is out of quota.",
+ "_2026-10-24b": "2026-10-24 ~11:15 owner: 'pause beam after this round, or swap it to ... finding bugs' - beam out of the fix pool (running sessions finish), moved to the patrol (PATROL-ENGINE)"
+}
