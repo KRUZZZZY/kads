@@ -2471,6 +2471,10 @@ def qa_one(path, reviewer=None):
     qa_logs.mkdir(parents=True, exist_ok=True)
     brief = qa_brief(rec, reviewer) if reviewer in ("luna", "haiku") else qa_brief_qwen(rec, qa_logs)
     out = D["qa/reviews"] / (f"{s}.r{rnd}.{rec.get('qa_stage', 'code')}.md" if rec.get("kind") == "feature" else f"{s}.r{rnd}.md")
+    if out.exists():
+        # 2026-10-25: a re-run of the same review (re-ask, retry) whose reviewer crashed before writing would otherwise
+        # have the PREVIOUS attempt's verdict parsed as its own. Keep the old text, out of the round's glob.
+        out.rename(out.with_name(f"{out.stem}.prev-{int(time.time())}{out.suffix}"))
     (D["runs"] / f"{s}.r{rnd}" / "qa-brief.md").write_text(brief)
     log("qa", f"{s} r{rnd} ({rec['kind']}, {rec.get('engine', 'qwen')}: {rec.get('qwen_verdict')}) "
               f"{rname if reviewer in ('luna', 'haiku') else 'Qwen (separate session)'} review start")
