@@ -1,4 +1,4 @@
-# An agent delegation surface: find → fix → review → merge
+# KADS blueprint: an agent delegation surface for find → fix → review → merge
 
 _A reproducible blueprint for delegating a codebase's bug and feature work to coding-agent harnesses._
 

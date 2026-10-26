@@ -1,7 +1,7 @@
-# zene-studio-fix-pipeline
+# KADS: KRUZZZZY's Agent Delegation Surface
 
 **An automated delegation surface for coding-agent harnesses.** You define the roles (finder, triager, fixer,
-reviewer, integrator), point each role at whichever agent harness and model you want, and the pipeline runs the
+reviewer, integrator), point each role at whichever agent harness and model you want, and KADS runs the
 work between them unattended: queue, routing, budgets, escalation, mechanical checks, independent review and merge
 trains. A human is needed only when every agent on the escalation ladder has failed a job.
 
@@ -9,11 +9,13 @@ It does not contain a model or an agent of its own. It is the control plane *aro
 Code, OpenAI Codex, OpenCode, MiniMax Code, a DeepSeek harness and local Ollama models side by side, each as one
 or more "lanes" with its own quota, pacing and failure handling.
 
+KADS began as the fix pipeline behind Zene Studio and still runs it.
+
 > **Status: reference implementation, not yet repo-agnostic.** It was built for one repository,
 > [Zene Studio](https://github.com/KRUZZZZY/zene-studio) (a C++/Qt DAW). Paths, build and test commands, gates and
-> lane definitions are still wired to that repo and one workstation. The goal is to change that: open the pipeline,
+> lane definitions are still wired to that repo and one workstation. The goal is to change that: open KADS,
 > pick an agent per role, point it at a repo, and get a bug tracker and queue for that repo. The work towards that is tracked in
-> [issue #1](https://github.com/KRUZZZZY/zene-studio-fix-pipeline/issues/1).
+> [issue #1](https://github.com/KRUZZZZY/kads/issues/1).
 > Until it lands, read this as a working design with working code you can lift from.
 
 ## What the surface does
@@ -77,7 +79,7 @@ Three ways in, from least to most effort:
    `submit_check.py` (pre-submit checklist), `scope_guard.py`, `stuck_detector.py`, `review_diversity.py`,
    `conflict_forecast.py`. Swap in your build and test commands.
 3. **Run the whole thing.** Possible, but expect to edit paths, lanes and build/gate commands by hand (see
-   `qwen/README.md` and `qwen/WORKFLOW.md`). This is the part [issue #1](https://github.com/KRUZZZZY/zene-studio-fix-pipeline/issues/1) sets out to remove.
+   `qwen/README.md` and `qwen/WORKFLOW.md`). This is the part [issue #1](https://github.com/KRUZZZZY/kads/issues/1) sets out to remove.
 
 ### Choosing where notifications go
 
